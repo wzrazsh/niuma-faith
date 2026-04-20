@@ -16,7 +16,8 @@ pub enum TaskCategory {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TaskStatus {
-    Active,
+    Running,
+    Paused,
     Completed,
     Abandoned,
 }
@@ -34,7 +35,10 @@ pub struct Task {
     pub status: TaskStatus,
     pub notes: String,
     pub created_at: String,
+    pub started_at: Option<String>,
     pub completed_at: Option<String>,
+    pub duration_seconds: i64,
+    pub ai_summary: Option<String>,
     pub updated_at: String,
 }
 

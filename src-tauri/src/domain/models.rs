@@ -71,6 +71,7 @@ pub struct User {
     pub nickname: String,
     pub cumulative_faith: i64,
     pub current_level: i32,
+    pub armor_points: i32,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -93,4 +94,16 @@ pub struct FaithStatus {
     pub progress_to_next: i64,
     pub next_threshold: Option<i64>,
     pub today: Option<DailyRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FaithTransaction {
+    pub id: Option<i64>,
+    pub user_id: String,
+    pub ts: String,
+    pub delta: i32,
+    pub armor_delta: i32,
+    pub kind: String,
+    pub ref_id: Option<String>,
+    pub message: String,
 }
