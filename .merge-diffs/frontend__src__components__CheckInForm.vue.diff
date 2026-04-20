@@ -1,0 +1,31 @@
+diff --git a/frontend/src/components/CheckInForm.vue b/frontend/src/components/CheckInForm.vue
+index 7d5a6c4..c2fa155 100644
+--- a/frontend/src/components/CheckInForm.vue
++++ b/frontend/src/components/CheckInForm.vue
+@@ -96,7 +96,7 @@ async function handleSubmit() {
+         />
+         <span class="input-unit">次</span>
+       </div>
+-      <span class="input-hint">≤2次得8分，3-4次得4分，≥5次得0分</span>
++      <span class="input-hint">≤2次得80分，3-4次得40分，≥5次得0分</span>
+     </div>
+ 
+     <div class="form-group">
+@@ -111,7 +111,7 @@ async function handleSubmit() {
+           <option value="2">长时间失联未解释</option>
+         </select>
+       </div>
+-      <span class="input-hint">无得6分，有解释得3分，未解释得0分</span>
++      <span class="input-hint">无得60分，有解释得30分，未解释得0分</span>
+     </div>
+ 
+     <div class="form-group">
+@@ -129,7 +129,7 @@ async function handleSubmit() {
+         />
+         <span class="input-unit">已完成今日记录闭环</span>
+       </div>
+-      <span class="input-hint">完成得6分，未完成得0分</span>
++      <span class="input-hint">完成得60分，未完成得0分</span>
+     </div>
+ 
+     <button

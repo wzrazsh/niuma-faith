@@ -1,0 +1,57 @@
+diff --git a/src-tauri/src/application/faith_service.rs b/src-tauri/src/application/faith_service.rs
+index d867a95..98b49f1 100644
+--- a/src-tauri/src/application/faith_service.rs
++++ b/src-tauri/src/application/faith_service.rs
+@@ -5,18 +5,21 @@ use std::sync::Arc;
+ 
+ use crate::data::{DailyRecordRepo, RepoError, SqliteDb, UserRepo};
+ use crate::domain::{
+-    build_daily_record, calculate_daily, get_level, progress_to_next, DailyRecord,
++    get_level, progress_to_next, DailyRecord,
+     DisciplineInput, FaithStatus, User,
+ };
++use crate::application::FaithLedgerService;
+ 
+ /// Check-in service — orchestrates domain logic and persistence.
+ pub struct FaithService {
+     db: Arc<SqliteDb>,
++    ledger: Arc<FaithLedgerService>,
+ }
+ 
+ impl FaithService {
+     pub fn new(db: Arc<SqliteDb>) -> Self {
+-        Self { db }
++        let ledger = Arc::new(FaithLedgerService::new(db.clone()));
++        Self { db, ledger }
+     }
+ 
+     /// Process a check-in for `user_id` on the current Beijing-time date.
+@@ -36,19 +39,7 @@ impl FaithService {
+     ) -> Result<FaithStatus, RepoError> {
+         let now = chrono::Local::now();
+         let date = now.format("%Y-%m-%d").to_string();
+-        let now_ts = now.to_rfc3339();
+-
+-        // 1. Pure domain calculation
+-        let breakdown = calculate_daily(work_minutes, study_minutes, discipline);
+-        let record = build_daily_record(user_id, &date, work_minutes, study_minutes, discipline, breakdown, &now_ts);
+-
+-        // 2. Upsert daily record (single transaction)
+-        DailyRecordRepo::upsert(&*self.db, &record)?;
+-
+-        // 3. Add today's total faith to cumulative
+-        UserRepo::add_faith(&*self.db, user_id, breakdown.total())?;
+-
+-        // 4. Build status response
++        let record = self.ledger.upsert_daily_record(user_id, &date, work_minutes, study_minutes, discipline)?;
+         self.build_status(user_id, Some(record))
+     }
+ 
+@@ -82,6 +73,7 @@ impl FaithService {
+             nickname: String::new(),
+             cumulative_faith: 0,
+             current_level: 1,
++            armor_points: 0,
+             created_at: now.clone(),
+             updated_at: now,
+         };

@@ -1,0 +1,26 @@
+diff --git a/src-tauri/src/data/repository.rs b/src-tauri/src/data/repository.rs
+index 6622e4a..858f330 100644
+--- a/src-tauri/src/data/repository.rs
++++ b/src-tauri/src/data/repository.rs
+@@ -1,7 +1,7 @@
+ // src-tauri/src/data/repository.rs
+ //! Repository trait definitions
+ 
+-use crate::domain::{DailyRecord, Task, TaskStatus, User};
++use crate::domain::{DailyRecord, FaithTransaction, Task, TaskStatus, User};
+ 
+ /// Error type for data layer operations.
+ #[derive(Debug, thiserror::Error)]
+@@ -45,3 +45,12 @@ pub trait TaskRepo: Send + Sync {
+     fn update(&self, task: &Task) -> Result<(), RepoError>;
+     fn delete(&self, id: &str) -> Result<(), RepoError>;
+ }
++
++pub trait FaithTransactionRepo: Send + Sync {
++    fn insert(&self, tx: &FaithTransaction) -> Result<(), RepoError>;
++}
++
++pub trait TaskSessionRepo: Send + Sync {
++    fn start_session(&self, task_id: &str, start_ts: &str) -> Result<(), RepoError>;
++    fn end_open_session(&self, task_id: &str, end_ts: &str) -> Result<i64, RepoError>;
++}

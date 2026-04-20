@@ -1,0 +1,399 @@
+diff --git a/src-tauri/src/domain/faith.rs b/src-tauri/src/domain/faith.rs
+index 3c8af39..fa0d7a2 100644
+--- a/src-tauri/src/domain/faith.rs
++++ b/src-tauri/src/domain/faith.rs
+@@ -6,21 +6,21 @@ use super::models::{DailyRecord, DisciplineInput, FaithBreakdown};
+ /// Calculate survival faith (work) based on minutes worked.
+ /// Tiers (integer minutes):
+ ///   0 – 119 min  → 0
+-/// 120 – 239 min  → 10
+-/// 240 – 359 min  → 20
+-/// 360 – 479 min  → 30
+-/// 480+           → 40
++/// 120 – 239 min  → 100
++/// 240 – 359 min  → 200
++/// 360 – 479 min  → 300
++/// 480+           → 400
+ pub fn calc_survival(minutes: i32) -> i32 {
+     if minutes < 120 {
+         0
+     } else if minutes < 240 {
+-        10
++        100
+     } else if minutes < 360 {
+-        20
++        200
+     } else if minutes < 480 {
+-        30
++        300
+     } else {
+-        40
++        400
+     }
+ }
+ 
+@@ -33,30 +33,30 @@ pub fn calc_progress(minutes: i32) -> i32 {
+ /// Calculate discipline faith based on user's daily behavior.
+ ///
+ /// Returns (total, a, b, c) where:
+-/// - total: combined discipline faith (max 20)
+-/// - a: 专注稳定 score (0, 4, or 8)
+-/// - b: 离岗纪律 score (0, 3, or 6)
+-/// - c: 记录闭环 score (0 or 6)
++/// - total: combined discipline faith (max 200)
++/// - a: 专注稳定 score (0, 40, or 80)
++/// - b: 离岗纪律 score (0, 30, or 60)
++/// - c: 记录闭环 score (0 or 60)
+ ///
+ /// Scoring rules:
+-/// - A. 专注稳定: break_count ≤2 → 8, 3-4 → 4, ≥5 → 0
+-/// - B. 离岗纪律: leave_record 0 → 6, 1 → 3, 2 → 0
+-/// - C. 记录闭环: close_record ≥1 → 6, else 0
++/// - A. 专注稳定: break_count ≤2 → 80, 3-4 → 40, ≥5 → 0
++/// - B. 离岗纪律: leave_record 0 → 60, 1 → 30, 2 → 0
++/// - C. 记录闭环: close_record ≥1 → 60, else 0
+ pub fn calc_discipline(input: DisciplineInput) -> (i32, i32, i32, i32) {
+     // A. 专注稳定
+     let a = match input.break_count {
+-        n if n <= 2 => 8,
+-        n if n <= 4 => 4,
++        n if n <= 2 => 80,
++        n if n <= 4 => 40,
+         _ => 0,
+     };
+     // B. 离岗纪律
+     let b = match input.leave_record {
+-        0 => 6,
+-        1 => 3,
++        0 => 60,
++        1 => 30,
+         _ => 0,
+     };
+     // C. 记录闭环
+-    let c = if input.close_record >= 1 { 6 } else { 0 };
++    let c = if input.close_record >= 1 { 60 } else { 0 };
+     (a + b + c, a, b, c)
+ }
+ 
+@@ -76,7 +76,7 @@ pub fn calculate_daily(work_minutes: i32, study_minutes: i32, discipline: Discip
+ }
+ 
+ /// Build a DailyRecord from work/study minutes, discipline input and a pre-computed breakdown.
+-/// `date` must be a YYYY-MM-DD string in Beijing time.
++/// `date` must be a YYYY-MM-DD string in local time.
+ /// `now_ts` is an ISO-8601 timestamp string used for created_at / updated_at.
+ pub fn build_daily_record(
+     user_id: &str,
+@@ -131,57 +131,57 @@ mod tests {
+ 
+     #[test]
+     fn survival_120_min() {
+-        assert_eq!(calc_survival(120), 10);
++        assert_eq!(calc_survival(120), 100);
+     }
+ 
+     #[test]
+     fn survival_121_min() {
+-        assert_eq!(calc_survival(121), 10);
++        assert_eq!(calc_survival(121), 100);
+     }
+ 
+     #[test]
+     fn survival_239_min() {
+-        assert_eq!(calc_survival(239), 10);
++        assert_eq!(calc_survival(239), 100);
+     }
+ 
+     #[test]
+     fn survival_240_min() {
+-        assert_eq!(calc_survival(240), 20);
++        assert_eq!(calc_survival(240), 200);
+     }
+ 
+     #[test]
+     fn survival_241_min() {
+-        assert_eq!(calc_survival(241), 20);
++        assert_eq!(calc_survival(241), 200);
+     }
+ 
+     #[test]
+     fn survival_359_min() {
+-        assert_eq!(calc_survival(359), 20);
++        assert_eq!(calc_survival(359), 200);
+     }
+ 
+     #[test]
+     fn survival_360_min() {
+-        assert_eq!(calc_survival(360), 30);
++        assert_eq!(calc_survival(360), 300);
+     }
+ 
+     #[test]
+     fn survival_479_min() {
+-        assert_eq!(calc_survival(479), 30);
++        assert_eq!(calc_survival(479), 300);
+     }
+ 
+     #[test]
+     fn survival_480_min() {
+-        assert_eq!(calc_survival(480), 40);
++        assert_eq!(calc_survival(480), 400);
+     }
+ 
+     #[test]
+     fn survival_481_min() {
+-        assert_eq!(calc_survival(481), 40);
++        assert_eq!(calc_survival(481), 400);
+     }
+ 
+     #[test]
+     fn survival_large() {
+-        assert_eq!(calc_survival(1440), 40);
++        assert_eq!(calc_survival(1440), 400);
+     }
+ 
+     // --- calc_progress (same tiers) ---
+@@ -198,95 +198,95 @@ mod tests {
+ 
+     #[test]
+     fn progress_120_min() {
+-        assert_eq!(calc_progress(120), 10);
++        assert_eq!(calc_progress(120), 100);
+     }
+ 
+     #[test]
+     fn progress_479_min() {
+-        assert_eq!(calc_progress(479), 30);
++        assert_eq!(calc_progress(479), 300);
+     }
+ 
+     #[test]
+     fn progress_480_min() {
+-        assert_eq!(calc_progress(480), 40);
++        assert_eq!(calc_progress(480), 400);
+     }
+ 
+     // --- calc_discipline ---
+ 
+     #[test]
+     fn discipline_full_marks() {
+-        // (0, 0, 1) → total=20, a=8, b=6, c=6
++        // (0, 0, 1) → total=200, a=80, b=60, c=60
+         let input = DisciplineInput { break_count: 0, leave_record: 0, close_record: 1 };
+         let (total, a, b, c) = calc_discipline(input);
+-        assert_eq!(total, 20);
+-        assert_eq!(a, 8);
+-        assert_eq!(b, 6);
+-        assert_eq!(c, 6);
++        assert_eq!(total, 200);
++        assert_eq!(a, 80);
++        assert_eq!(b, 60);
++        assert_eq!(c, 60);
+     }
+ 
+     #[test]
+     fn discipline_break_count_2() {
+-        // (2, 0, 1) → total=20, a=8, b=6, c=6
++        // (2, 0, 1) → total=200, a=80, b=60, c=60
+         let input = DisciplineInput { break_count: 2, leave_record: 0, close_record: 1 };
+-        let (total, a, b, c) = calc_discipline(input);
+-        assert_eq!(total, 20);
+-        assert_eq!(a, 8);
++        let (total, a, _, _) = calc_discipline(input);
++        assert_eq!(total, 200);
++        assert_eq!(a, 80);
+     }
+ 
+     #[test]
+     fn discipline_break_count_3() {
+-        // (3, 0, 1) → total=16, a=4, b=6, c=6
++        // (3, 0, 1) → total=160, a=40, b=60, c=60
+         let input = DisciplineInput { break_count: 3, leave_record: 0, close_record: 1 };
+         let (total, a, b, c) = calc_discipline(input);
+-        assert_eq!(total, 16);
+-        assert_eq!(a, 4);
+-        assert_eq!(b, 6);
+-        assert_eq!(c, 6);
++        assert_eq!(total, 160);
++        assert_eq!(a, 40);
++        assert_eq!(b, 60);
++        assert_eq!(c, 60);
+     }
+ 
+     #[test]
+     fn discipline_break_count_4() {
+-        // (4, 0, 1) → total=16, a=4, b=6, c=6
++        // (4, 0, 1) → total=160, a=40, b=60, c=60
+         let input = DisciplineInput { break_count: 4, leave_record: 0, close_record: 1 };
+-        let (total, a, b, c) = calc_discipline(input);
+-        assert_eq!(total, 16);
+-        assert_eq!(a, 4);
++        let (total, a, _, _) = calc_discipline(input);
++        assert_eq!(total, 160);
++        assert_eq!(a, 40);
+     }
+ 
+     #[test]
+     fn discipline_break_count_5() {
+-        // (5, 0, 1) → total=12, a=0, b=6, c=6
++        // (5, 0, 1) → total=120, a=0, b=60, c=60
+         let input = DisciplineInput { break_count: 5, leave_record: 0, close_record: 1 };
+-        let (total, a, b, c) = calc_discipline(input);
+-        assert_eq!(total, 12);
++        let (total, a, _, _) = calc_discipline(input);
++        assert_eq!(total, 120);
+         assert_eq!(a, 0);
+     }
+ 
+     #[test]
+     fn discipline_leave_record_1() {
+-        // (0, 1, 1) → total=17, a=8, b=3, c=6
++        // (0, 1, 1) → total=170, a=80, b=30, c=60
+         let input = DisciplineInput { break_count: 0, leave_record: 1, close_record: 1 };
+-        let (total, a, b, c) = calc_discipline(input);
+-        assert_eq!(total, 17);
+-        assert_eq!(a, 8);
+-        assert_eq!(b, 3);
++        let (total, a, b, _) = calc_discipline(input);
++        assert_eq!(total, 170);
++        assert_eq!(a, 80);
++        assert_eq!(b, 30);
+     }
+ 
+     #[test]
+     fn discipline_leave_record_2() {
+-        // (0, 2, 1) → total=14, a=8, b=0, c=6
++        // (0, 2, 1) → total=140, a=80, b=0, c=60
+         let input = DisciplineInput { break_count: 0, leave_record: 2, close_record: 1 };
+-        let (total, a, b, c) = calc_discipline(input);
+-        assert_eq!(total, 14);
++        let (total, _, b, _) = calc_discipline(input);
++        assert_eq!(total, 140);
+         assert_eq!(b, 0);
+     }
+ 
+     #[test]
+     fn discipline_no_close_record() {
+-        // (0, 0, 0) → total=14, a=8, b=6, c=0
++        // (0, 0, 0) → total=140, a=80, b=60, c=0
+         let input = DisciplineInput { break_count: 0, leave_record: 0, close_record: 0 };
+-        let (total, a, b, c) = calc_discipline(input);
+-        assert_eq!(total, 14);
++        let (total, _, _, c) = calc_discipline(input);
++        assert_eq!(total, 140);
+         assert_eq!(c, 0);
+     }
+ 
+@@ -312,87 +312,87 @@ mod tests {
+         let b = calculate_daily(0, 0, default_discipline());
+         assert_eq!(b.survival_faith, 0);
+         assert_eq!(b.progress_faith, 0);
+-        assert_eq!(b.discipline_faith, 20);
+-        assert_eq!(b.total(), 20);
++        assert_eq!(b.discipline_faith, 200);
++        assert_eq!(b.total(), 200);
+     }
+ 
+     #[test]
+     fn daily_work_8h() {
+         let b = calculate_daily(480, 0, default_discipline());
+-        assert_eq!(b.survival_faith, 40);
++        assert_eq!(b.survival_faith, 400);
+         assert_eq!(b.progress_faith, 0);
+-        assert_eq!(b.discipline_faith, 20);
+-        assert_eq!(b.total(), 60);
++        assert_eq!(b.discipline_faith, 200);
++        assert_eq!(b.total(), 600);
+     }
+ 
+     #[test]
+     fn daily_work_8h_study_4h() {
+         let b = calculate_daily(480, 240, default_discipline());
+-        assert_eq!(b.survival_faith, 40);
+-        assert_eq!(b.progress_faith, 20);
+-        assert_eq!(b.discipline_faith, 20);
+-        assert_eq!(b.total(), 80);
++        assert_eq!(b.survival_faith, 400);
++        assert_eq!(b.progress_faith, 200);
++        assert_eq!(b.discipline_faith, 200);
++        assert_eq!(b.total(), 800);
+     }
+ 
+     #[test]
+     fn daily_full() {
+         let b = calculate_daily(480, 480, default_discipline());
+-        assert_eq!(b.total(), 100);
++        assert_eq!(b.total(), 1000);
+     }
+ 
+     #[test]
+     fn daily_boundary_119() {
+         let b = calculate_daily(119, 0, default_discipline());
+         assert_eq!(b.survival_faith, 0);
+-        assert_eq!(b.total(), 20);
++        assert_eq!(b.total(), 200);
+     }
+ 
+     #[test]
+     fn daily_boundary_120() {
+         let b = calculate_daily(120, 0, default_discipline());
+-        assert_eq!(b.survival_faith, 10);
+-        assert_eq!(b.total(), 30);
++        assert_eq!(b.survival_faith, 100);
++        assert_eq!(b.total(), 300);
+     }
+ 
+     #[test]
+     fn daily_boundary_121() {
+         let b = calculate_daily(121, 0, default_discipline());
+-        assert_eq!(b.survival_faith, 10);
+-        assert_eq!(b.total(), 30);
++        assert_eq!(b.survival_faith, 100);
++        assert_eq!(b.total(), 300);
+     }
+ 
+     #[test]
+     fn daily_boundary_479() {
+         let b = calculate_daily(479, 479, default_discipline());
+-        assert_eq!(b.survival_faith, 30);
+-        assert_eq!(b.progress_faith, 30);
+-        assert_eq!(b.total(), 80);
++        assert_eq!(b.survival_faith, 300);
++        assert_eq!(b.progress_faith, 300);
++        assert_eq!(b.total(), 800);
+     }
+ 
+     #[test]
+     fn daily_boundary_480() {
+         let b = calculate_daily(480, 480, default_discipline());
+-        assert_eq!(b.survival_faith, 40);
+-        assert_eq!(b.progress_faith, 40);
+-        assert_eq!(b.total(), 100);
++        assert_eq!(b.survival_faith, 400);
++        assert_eq!(b.progress_faith, 400);
++        assert_eq!(b.total(), 1000);
+     }
+ 
+     #[test]
+     fn daily_progress_479() {
+         let b = calculate_daily(0, 479, default_discipline());
+-        assert_eq!(b.progress_faith, 30);
+-        assert_eq!(b.total(), 50);
++        assert_eq!(b.progress_faith, 300);
++        assert_eq!(b.total(), 500);
+     }
+ 
+     #[test]
+     fn daily_discipline_partial() {
+-        // Low discipline: (5, 2, 0) → 60 total (survival 40 + progress 20 + discipline 0)
++        // Low discipline: (5, 2, 0) → 600 total (survival 400 + progress 200 + discipline 0)
+         let input = DisciplineInput { break_count: 5, leave_record: 2, close_record: 0 };
+         let b = calculate_daily(480, 240, input);
+         assert_eq!(b.discipline_faith, 0);
+         assert_eq!(b.discipline_a, 0);
+         assert_eq!(b.discipline_b, 0);
+         assert_eq!(b.discipline_c, 0);
+-        assert_eq!(b.total(), 60);
++        assert_eq!(b.total(), 600);
+     }
+ }

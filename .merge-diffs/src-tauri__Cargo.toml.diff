@@ -1,0 +1,30 @@
+diff --git a/src-tauri/Cargo.toml b/src-tauri/Cargo.toml
+index c73e616..8d896bc 100644
+--- a/src-tauri/Cargo.toml
++++ b/src-tauri/Cargo.toml
+@@ -10,13 +10,14 @@ crate-type = ["staticlib", "cdylib", "rlib"]
+ [[bin]]
+ name = "niuma-faith"
+ path = "src/main.rs"
++required-features = ["desktop"]
+ 
+ [build-dependencies]
+ tauri-build = { version = "2", features = [] }
+ 
+ [dependencies]
+-tauri = { version = "2", features = ["tray-icon"] }
+-tauri-plugin-shell = "2"
++tauri = { version = "2", features = ["tray-icon"], optional = true }
++tauri-plugin-shell = { version = "2", optional = true }
+ serde = { version = "1", features = ["derive"] }
+ serde_json = "1"
+ rusqlite = { version = "0.31", features = ["bundled"] }
+@@ -26,5 +27,6 @@ tracing = "0.1"
+ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ 
+ [features]
+-default = ["custom-protocol"]
+-custom-protocol = ["tauri/custom-protocol"]
++default = ["desktop", "custom-protocol"]
++desktop = ["dep:tauri", "dep:tauri-plugin-shell"]
++custom-protocol = ["desktop", "tauri/custom-protocol"]
