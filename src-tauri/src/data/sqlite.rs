@@ -4,8 +4,8 @@
 use std::sync::Mutex;
 
 use crate::data::schema::init_schema;
-use crate::data::repository::{DailyRecordRepo, RepoError, TaskRepo, UserRepo};
-use crate::domain::{DailyRecord, Task, TaskStatus, User};
+use crate::data::repository::{DailyRecordRepo, FaithTransactionRepo, RepoError, TaskRepo, TaskSessionRepo, UserRepo};
+use crate::domain::{DailyRecord, FaithTransaction, Task, TaskStatus, User};
 
 /// Shared SQLite connection pool wrapper.
 /// rusqlite Connection is not thread-safe; we use a Mutex (single writer).
@@ -47,7 +47,7 @@ impl UserRepo for SqliteDb {
     fn get(&self, user_id: &str) -> Result<Option<User>, RepoError> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, nickname, cumulative_faith, current_level, created_at, updated_at
+                "SELECT id, nickname, cumulative_faith, current_level, armor_points, created_at, updated_at
                  FROM users WHERE id = ?",
             )?;
             let mut rows = stmt.query([user_id])?;
@@ -57,8 +57,9 @@ impl UserRepo for SqliteDb {
                     nickname: row.get(1)?,
                     cumulative_faith: row.get(2)?,
                     current_level: row.get(3)?,
-                    created_at: row.get(4)?,
-                    updated_at: row.get(5)?,
+                    armor_points: row.get(4)?,
+                    created_at: row.get(5)?,
+                    updated_at: row.get(6)?,
                 }))
             } else {
                 Ok(None)
@@ -69,18 +70,20 @@ impl UserRepo for SqliteDb {
     fn upsert(&self, user: &User) -> Result<(), RepoError> {
         self.with_conn(|conn| {
             conn.execute(
-                "INSERT INTO users (id, nickname, cumulative_faith, current_level, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                "INSERT INTO users (id, nickname, cumulative_faith, current_level, armor_points, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
                  ON CONFLICT(id) DO UPDATE SET
                    nickname = excluded.nickname,
                    cumulative_faith = excluded.cumulative_faith,
                    current_level = excluded.current_level,
+                   armor_points = excluded.armor_points,
                    updated_at = excluded.updated_at",
                 rusqlite::params![
                     user.id,
                     user.nickname,
                     user.cumulative_faith,
                     user.current_level,
+                    user.armor_points,
                     user.created_at,
                     user.updated_at,
                 ],
@@ -207,8 +210,8 @@ impl TaskRepo for SqliteDb {
         self.with_conn(|conn| {
             conn.execute(
                 "INSERT INTO tasks (id, user_id, title, description, category, estimated_minutes,
-                 actual_minutes, status, notes, created_at, completed_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                 actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
                 rusqlite::params![
                     task.id,
                     task.user_id,
@@ -220,7 +223,10 @@ impl TaskRepo for SqliteDb {
                     serde_json::to_string(&task.status).unwrap(),
                     task.notes,
                     task.created_at,
+                    task.started_at,
                     task.completed_at,
+                    task.duration_seconds,
+                    task.ai_summary,
                     task.updated_at,
                 ],
             )?;
@@ -232,7 +238,7 @@ impl TaskRepo for SqliteDb {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT id, user_id, title, description, category, estimated_minutes,
-                        actual_minutes, status, notes, created_at, completed_at, updated_at
+                        actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at
                  FROM tasks WHERE id = ?",
             )?;
             let mut rows = stmt.query([id])?;
@@ -251,7 +257,7 @@ impl TaskRepo for SqliteDb {
                     let status_str = serde_json::to_string(&s).unwrap();
                     let mut stmt = conn.prepare(
                         "SELECT id, user_id, title, description, category, estimated_minutes,
-                                actual_minutes, status, notes, created_at, completed_at, updated_at
+                                actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at
                          FROM tasks WHERE user_id = ? AND status = ?",
                     )?;
                     let mut rows = stmt.query([user_id, &status_str])?;
@@ -264,7 +270,7 @@ impl TaskRepo for SqliteDb {
                 None => {
                     let mut stmt = conn.prepare(
                         "SELECT id, user_id, title, description, category, estimated_minutes,
-                                actual_minutes, status, notes, created_at, completed_at, updated_at
+                                actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at
                          FROM tasks WHERE user_id = ?",
                     )?;
                     let mut rows = stmt.query([user_id])?;
@@ -283,7 +289,7 @@ impl TaskRepo for SqliteDb {
         self.with_conn(|conn| {
             conn.execute(
                 "UPDATE tasks SET title=?, description=?, category=?, estimated_minutes=?,
-                 actual_minutes=?, status=?, notes=?, completed_at=?, updated_at=?
+                 actual_minutes=?, status=?, notes=?, started_at=?, completed_at=?, duration_seconds=?, ai_summary=?, updated_at=?
                  WHERE id=?",
                 rusqlite::params![
                     task.title,
@@ -293,7 +299,10 @@ impl TaskRepo for SqliteDb {
                     task.actual_minutes,
                     serde_json::to_string(&task.status).unwrap(),
                     task.notes,
+                    task.started_at,
                     task.completed_at,
+                    task.duration_seconds,
+                    task.ai_summary,
                     task.updated_at,
                     task.id,
                 ],
@@ -310,8 +319,71 @@ impl TaskRepo for SqliteDb {
     }
 }
 
+impl FaithTransactionRepo for SqliteDb {
+    fn insert(&self, tx: &FaithTransaction) -> Result<(), RepoError> {
+        self.with_conn(|conn| {
+            conn.execute(
+                "INSERT INTO faith_transactions (user_id, ts, delta, armor_delta, kind, ref_id, message)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    tx.user_id,
+                    tx.ts,
+                    tx.delta,
+                    tx.armor_delta,
+                    tx.kind,
+                    tx.ref_id,
+                    tx.message,
+                ],
+            )?;
+            Ok(())
+        })
+    }
+}
+
+impl TaskSessionRepo for SqliteDb {
+    fn start_session(&self, task_id: &str, start_ts: &str) -> Result<(), RepoError> {
+        self.with_conn(|conn| {
+            conn.execute(
+                "INSERT INTO task_sessions (task_id, start_ts) VALUES (?1, ?2)",
+                rusqlite::params![task_id, start_ts],
+            )?;
+            Ok(())
+        })
+    }
+
+    fn end_open_session(&self, task_id: &str, end_ts: &str) -> Result<i64, RepoError> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT id, start_ts FROM task_sessions
+                 WHERE task_id = ?1 AND end_ts IS NULL
+                 ORDER BY id DESC LIMIT 1",
+            )?;
+            let mut rows = stmt.query([task_id])?;
+            let Some(row) = rows.next()? else {
+                return Ok(0);
+            };
+            let id: i64 = row.get(0)?;
+            let start_ts: String = row.get(1)?;
+
+            let start = chrono::DateTime::parse_from_rfc3339(&start_ts)
+                .map_err(|e| RepoError::Sqlite(rusqlite::Error::InvalidParameterName(e.to_string())))?;
+            let end = chrono::DateTime::parse_from_rfc3339(end_ts)
+                .map_err(|e| RepoError::Sqlite(rusqlite::Error::InvalidParameterName(e.to_string())))?;
+            let seconds = (end - start).num_seconds().max(0);
+
+            conn.execute(
+                "UPDATE task_sessions SET end_ts = ?1, seconds = ?2 WHERE id = ?3",
+                rusqlite::params![end_ts, seconds, id],
+            )?;
+
+            Ok(seconds)
+        })
+    }
+}
+
 /// Helper: convert a rusqlite row to a Task.
 fn row_to_task(row: &rusqlite::Row) -> Result<Task, RepoError> {
+    let raw_status: String = row.get(7)?;
     Ok(Task {
         id: row.get(0)?,
         user_id: row.get(1)?,
@@ -322,14 +394,28 @@ fn row_to_task(row: &rusqlite::Row) -> Result<Task, RepoError> {
         })?,
         estimated_minutes: row.get(5)?,
         actual_minutes: row.get(6)?,
-        status: serde_json::from_str(&row.get::<_, String>(7)?).map_err(|e| {
-            RepoError::Sqlite(rusqlite::Error::InvalidParameterName(e.to_string()))
-        })?,
+        status: parse_task_status(&raw_status)?,
         notes: row.get(8)?,
         created_at: row.get(9)?,
-        completed_at: row.get(10)?,
-        updated_at: row.get(11)?,
+        started_at: row.get(10)?,
+        completed_at: row.get(11)?,
+        duration_seconds: row.get(12)?,
+        ai_summary: row.get(13)?,
+        updated_at: row.get(14)?,
     })
+}
+
+fn parse_task_status(raw: &str) -> Result<TaskStatus, RepoError> {
+    match raw {
+        "\"active\"" => Ok(TaskStatus::Paused),
+        "\"running\"" => Ok(TaskStatus::Running),
+        "\"paused\"" => Ok(TaskStatus::Paused),
+        "\"completed\"" => Ok(TaskStatus::Completed),
+        "\"abandoned\"" => Ok(TaskStatus::Abandoned),
+        _ => serde_json::from_str(raw).map_err(|e| {
+            RepoError::Sqlite(rusqlite::Error::InvalidParameterName(e.to_string()))
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -353,6 +439,7 @@ mod tests {
             nickname: "Test".into(),
             cumulative_faith: 0,
             current_level: 1,
+            armor_points: 0,
             created_at: "2026-04-18T00:00:00+08:00".into(),
             updated_at: "2026-04-18T00:00:00+08:00".into(),
         };
@@ -378,7 +465,7 @@ mod tests {
         let loaded = DailyRecordRepo::get(&db, "u1", "2026-04-18").unwrap().unwrap();
         assert_eq!(loaded.work_minutes, 0);
         assert_eq!(loaded.study_minutes, 240);
-        assert_eq!(loaded.total_faith, 40);
+        assert_eq!(loaded.total_faith, 400);
     }
 
     #[test]
@@ -395,8 +482,8 @@ mod tests {
 
         let day1 = DailyRecordRepo::get(&db, "u1", "2026-04-18").unwrap().unwrap();
         let day2 = DailyRecordRepo::get(&db, "u1", "2026-04-19").unwrap().unwrap();
-        assert_eq!(day1.total_faith, 60);
-        assert_eq!(day2.total_faith, 60);
+        assert_eq!(day1.total_faith, 600);
+        assert_eq!(day2.total_faith, 600);
     }
 
     #[test]
@@ -408,14 +495,15 @@ mod tests {
             nickname: "".into(),
             cumulative_faith: 0,
             current_level: 1,
+            armor_points: 0,
             created_at: now.into(),
             updated_at: now.into(),
         };
         UserRepo::upsert(&db, &user).unwrap();
 
-        UserRepo::add_faith(&db, "u1", 1500).unwrap();
+        UserRepo::add_faith(&db, "u1", 15_000).unwrap();
         let loaded = UserRepo::get(&db, "u1").unwrap().unwrap();
-        assert_eq!(loaded.cumulative_faith, 1500);
+        assert_eq!(loaded.cumulative_faith, 15_000);
         assert_eq!(loaded.current_level, 2);
     }
 }

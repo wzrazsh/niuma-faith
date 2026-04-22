@@ -1,7 +1,7 @@
 // src-tauri/src/data/repository.rs
 //! Repository trait definitions
 
-use crate::domain::{DailyRecord, Task, TaskStatus, User};
+use crate::domain::{DailyRecord, FaithTransaction, Task, TaskStatus, User};
 
 /// Error type for data layer operations.
 #[derive(Debug, thiserror::Error)]
@@ -44,4 +44,13 @@ pub trait TaskRepo: Send + Sync {
     fn get_by_user(&self, user_id: &str, status: Option<TaskStatus>) -> Result<Vec<Task>, RepoError>;
     fn update(&self, task: &Task) -> Result<(), RepoError>;
     fn delete(&self, id: &str) -> Result<(), RepoError>;
+}
+
+pub trait FaithTransactionRepo: Send + Sync {
+    fn insert(&self, tx: &FaithTransaction) -> Result<(), RepoError>;
+}
+
+pub trait TaskSessionRepo: Send + Sync {
+    fn start_session(&self, task_id: &str, start_ts: &str) -> Result<(), RepoError>;
+    fn end_open_session(&self, task_id: &str, end_ts: &str) -> Result<i64, RepoError>;
 }

@@ -1,0 +1,149 @@
+{
+  ".merge-diffs/frontend__src__api__task.ts.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 26,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/frontend__src__api__task.ts.diff b/.merge-diffs/frontend__src__api__task.ts.diff\nnew file mode 100644\nindex 0000000..9744beb\n--- /dev/null\n+++ b/.merge-diffs/frontend__src__api__task.ts.diff\n@@ -0,0 +1,27 @@\n+diff --git a/frontend/src/api/task.ts b/frontend/src/api/task.ts\n+index 353df44..607eebf 100644\n+--- a/frontend/src/api/task.ts\n++++ b/frontend/src/api/task.ts\n+@@ -55,6 +55,22 @@ export async function invoke_complete_task(\n+   });\n+ }\n+ \n++export async function invoke_start_task(id: string): Promise<Task> {\n++  return invoke<Task>(\"start_task\", { id });\n++}\n++\n++export async function invoke_pause_task(id: string): Promise<Task> {\n++  return invoke<Task>(\"pause_task\", { id });\n++}\n++\n++export async function invoke_resume_task(id: string): Promise<Task> {\n++  return invoke<Task>(\"resume_task\", { id });\n++}\n++\n++export async function invoke_end_task(id: string): Promise<Task> {\n++  return invoke<Task>(\"end_task\", { id });\n++}\n++"
+  },
+  ".merge-diffs/frontend__src__components__CheckInForm.vue.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 30,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/frontend__src__components__CheckInForm.vue.diff b/.merge-diffs/frontend__src__components__CheckInForm.vue.diff\nnew file mode 100644\nindex 0000000..b38bf0a\n--- /dev/null\n+++ b/.merge-diffs/frontend__src__components__CheckInForm.vue.diff\n@@ -0,0 +1,31 @@\n+diff --git a/frontend/src/components/CheckInForm.vue b/frontend/src/components/CheckInForm.vue\n+index 7d5a6c4..c2fa155 100644\n+--- a/frontend/src/components/CheckInForm.vue\n++++ b/frontend/src/components/CheckInForm.vue\n+@@ -96,7 +96,7 @@ async function handleSubmit() {\n+         />\n+         <span class=\"input-unit\">次</span>\n+       </div>\n+-      <span class=\"input-hint\">≤2次得8分，3-4次得4分，≥5次得0分</span>\n++      <span class=\"input-hint\">≤2次得80分，3-4次得40分，≥5次得0分</span>\n+     </div>\n+ \n+     <div class=\"form-group\">\n+@@ -111,7 +111,7 @@ async function handleSubmit() {\n+           <option value=\"2\">长时间失联未解释</option>\n+         </select>\n+       </div>\n+-      <span class=\"input-hint\">无得6分，有解释得3分，未解释得0分</span>\n++      <span class=\"input-hint\">无得60分，有解释得30分，未解释得0分</span>\n+     </div>\n+ \n+     <div class=\"form-group\">\n+@@ -129,7 +129,7 @@ async function handleSubmit() {\n+         />"
+  },
+  ".merge-diffs/frontend__src__components__FloatingWidget.vue.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 47,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/frontend__src__components__FloatingWidget.vue.diff b/.merge-diffs/frontend__src__components__FloatingWidget.vue.diff\nnew file mode 100644\nindex 0000000..dd677ad\n--- /dev/null\n+++ b/.merge-diffs/frontend__src__components__FloatingWidget.vue.diff\n@@ -0,0 +1,48 @@\n+diff --git a/frontend/src/components/FloatingWidget.vue b/frontend/src/components/FloatingWidget.vue\n+index f6be19b..c3386be 100644\n+--- a/frontend/src/components/FloatingWidget.vue\n++++ b/frontend/src/components/FloatingWidget.vue\n+@@ -14,14 +14,14 @@\n+         role=\"progressbar\"\n+         :aria-valuenow=\"todayFaith\"\n+         aria-valuemin=\"0\"\n+-        aria-valuemax=\"100\"\n+-        :aria-label=\"`今日信仰进度 ${todayFaith}/100`\"\n++        aria-valuemax=\"1000\"\n++        :aria-label=\"`今日信仰进度 ${todayFaith}/1000`\"\n+       >\n+         <div class=\"progress-label\">今日</div>\n+         <div class=\"progress-bar\">\n+           <div class=\"progress-fill\" :style=\"{ width: todayPercent + '%' }\"></div>\n+         </div>\n+-        <div class=\"progress-text\">{{ todayFaith }}/100</div>\n++        <div class=\"progress-text\">{{ todayFaith }}/1000</div>\n+       </div>\n+       <div v-if=\"error\" class=\"error-message\" role=\"alert\">{{ error }}</div>\n+       <div class=\"quick-actions\" role=\"group\" aria-label=\"快速操作\">\n+@@ -50,7 +50,7 @@ const todayFaith = computed(() => {\n+   return (t.survival_faith || 0) + (t.progress_faith || 0) + (t.discipline_faith || 0);"
+  },
+  ".merge-diffs/frontend__src__components__TaskList.vue.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 72,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/frontend__src__components__TaskList.vue.diff b/.merge-diffs/frontend__src__components__TaskList.vue.diff\nnew file mode 100644\nindex 0000000..b347217\n--- /dev/null\n+++ b/.merge-diffs/frontend__src__components__TaskList.vue.diff\n@@ -0,0 +1,73 @@\n+diff --git a/frontend/src/components/TaskList.vue b/frontend/src/components/TaskList.vue\n+index 8e7c10a..efe98b6 100644\n+--- a/frontend/src/components/TaskList.vue\n++++ b/frontend/src/components/TaskList.vue\n+@@ -27,9 +27,20 @@ function closeForm() {\n+   editingTask.value = null;\n+ }\n+ \n+-async function handleComplete(task: Task) {\n+-  const actual = task.actual_minutes > 0 ? task.actual_minutes : task.estimated_minutes;\n+-  await store.completeTask(task.id, actual);\n++async function handleStart(task: Task) {\n++  await store.startTask(task.id);\n++}\n++\n++async function handlePause(task: Task) {\n++  await store.pauseTask(task.id);\n++}\n++\n++async function handleResume(task: Task) {\n++  await store.resumeTask(task.id);\n++}\n++\n++async function handleEnd(task: Task) {"
+  },
+  ".merge-diffs/frontend__src__stores__task.ts.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 119,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/frontend__src__stores__task.ts.diff b/.merge-diffs/frontend__src__stores__task.ts.diff\nnew file mode 100644\nindex 0000000..9ef9a45\n--- /dev/null\n+++ b/.merge-diffs/frontend__src__stores__task.ts.diff\n@@ -0,0 +1,120 @@\n+diff --git a/frontend/src/stores/task.ts b/frontend/src/stores/task.ts\n+index 6e00b04..53eecd0 100644\n+--- a/frontend/src/stores/task.ts\n++++ b/frontend/src/stores/task.ts\n+@@ -6,6 +6,10 @@ import {\n+   invoke_get_tasks,\n+   invoke_create_task,\n+   invoke_complete_task,\n++  invoke_start_task,\n++  invoke_pause_task,\n++  invoke_resume_task,\n++  invoke_end_task,\n+   invoke_update_task,\n+   invoke_abandon_task,\n+   invoke_delete_task,\n+@@ -19,7 +23,8 @@ export const useTaskStore = defineStore(\"task\", () => {\n+   const isLoading = ref(false);\n+   const error = ref<string | null>(null);\n+ \n+-  const activeTasks = computed(() => tasks.value.filter(t => t.status === \"active\"));\n++  const runningTasks = computed(() => tasks.value.filter(t => t.status === \"running\"));\n++  const pausedTasks = computed(() => tasks.value.filter(t => t.status === \"paused\"));\n+   const completedTasks = computed(() => tasks.value.filter(t => t.status === \"completed\"));\n+   const abandonedTasks = computed(() => tasks.value.filter(t => t.status === \"abandoned\"));"
+  },
+  ".merge-diffs/frontend__src__types__index.ts.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 31,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/frontend__src__types__index.ts.diff b/.merge-diffs/frontend__src__types__index.ts.diff\nnew file mode 100644\nindex 0000000..5daeb49\n--- /dev/null\n+++ b/.merge-diffs/frontend__src__types__index.ts.diff\n@@ -0,0 +1,32 @@\n+diff --git a/frontend/src/types/index.ts b/frontend/src/types/index.ts\n+index 77e8a55..c52bcbe 100644\n+--- a/frontend/src/types/index.ts\n++++ b/frontend/src/types/index.ts\n+@@ -5,6 +5,7 @@ export interface User {\n+   nickname: string;\n+   cumulative_faith: number;\n+   current_level: number;\n++  armor_points: number;\n+   created_at: string;\n+   updated_at: string;\n+ }\n+@@ -52,7 +53,7 @@ export interface FaithStatus {\n+ // --- Task types ---\n+ \n+ export type TaskCategory = 'work' | 'study' | 'other';\n+-export type TaskStatus = 'active' | 'completed' | 'abandoned';\n++export type TaskStatus = 'running' | 'paused' | 'completed' | 'abandoned';\n+ \n+ export interface Task {\n+   id: string;\n+@@ -65,7 +66,10 @@ export interface Task {\n+   status: TaskStatus;\n+   notes: string;"
+  },
+  ".merge-diffs/src-tauri__Cargo.toml.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 29,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__Cargo.toml.diff b/.merge-diffs/src-tauri__Cargo.toml.diff\nnew file mode 100644\nindex 0000000..a57bd66\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__Cargo.toml.diff\n@@ -0,0 +1,30 @@\n+diff --git a/src-tauri/Cargo.toml b/src-tauri/Cargo.toml\n+index c73e616..8d896bc 100644\n+--- a/src-tauri/Cargo.toml\n++++ b/src-tauri/Cargo.toml\n+@@ -10,13 +10,14 @@ crate-type = [\"staticlib\", \"cdylib\", \"rlib\"]\n+ [[bin]]\n+ name = \"niuma-faith\"\n+ path = \"src/main.rs\"\n++required-features = [\"desktop\"]\n+ \n+ [build-dependencies]\n+ tauri-build = { version = \"2\", features = [] }\n+ \n+ [dependencies]\n+-tauri = { version = \"2\", features = [\"tray-icon\"] }\n+-tauri-plugin-shell = \"2\"\n++tauri = { version = \"2\", features = [\"tray-icon\"], optional = true }\n++tauri-plugin-shell = { version = \"2\", optional = true }\n+ serde = { version = \"1\", features = [\"derive\"] }\n+ serde_json = \"1\"\n+ rusqlite = { version = \"0.31\", features = [\"bundled\"] }\n+@@ -26,5 +27,6 @@ tracing = \"0.1\"\n+ tracing-subscriber = { version = \"0.3\", features = [\"env-filter\"] }\n+ "
+  },
+  ".merge-diffs/src-tauri__build.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 10,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__build.rs.diff b/.merge-diffs/src-tauri__build.rs.diff\nnew file mode 100644\nindex 0000000..52a2832\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__build.rs.diff\n@@ -0,0 +1,11 @@\n+diff --git a/src-tauri/build.rs b/src-tauri/build.rs\n+index d860e1e..43033a7 100644\n+--- a/src-tauri/build.rs\n++++ b/src-tauri/build.rs\n+@@ -1,3 +1,5 @@\n+ fn main() {\n+-    tauri_build::build()\n++    if std::env::var_os(\"CARGO_FEATURE_DESKTOP\").is_some() {\n++        tauri_build::build()\n++    }\n+ }"
+  },
+  ".merge-diffs/src-tauri__src__application__faith_service.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 56,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__application__faith_service.rs.diff b/.merge-diffs/src-tauri__src__application__faith_service.rs.diff\nnew file mode 100644\nindex 0000000..69b0898\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__application__faith_service.rs.diff\n@@ -0,0 +1,57 @@\n+diff --git a/src-tauri/src/application/faith_service.rs b/src-tauri/src/application/faith_service.rs\n+index d867a95..98b49f1 100644\n+--- a/src-tauri/src/application/faith_service.rs\n++++ b/src-tauri/src/application/faith_service.rs\n+@@ -5,18 +5,21 @@ use std::sync::Arc;\n+ \n+ use crate::data::{DailyRecordRepo, RepoError, SqliteDb, UserRepo};\n+ use crate::domain::{\n+-    build_daily_record, calculate_daily, get_level, progress_to_next, DailyRecord,\n++    get_level, progress_to_next, DailyRecord,\n+     DisciplineInput, FaithStatus, User,\n+ };\n++use crate::application::FaithLedgerService;\n+ \n+ /// Check-in service — orchestrates domain logic and persistence.\n+ pub struct FaithService {\n+     db: Arc<SqliteDb>,\n++    ledger: Arc<FaithLedgerService>,\n+ }\n+ \n+ impl FaithService {\n+     pub fn new(db: Arc<SqliteDb>) -> Self {\n+-        Self { db }\n++        let ledger = Arc::new(FaithLedgerService::new(db.clone()));"
+  },
+  ".merge-diffs/src-tauri__src__application__ledger_service.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 96,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__application__ledger_service.rs.diff b/.merge-diffs/src-tauri__src__application__ledger_service.rs.diff\nnew file mode 100644\nindex 0000000..c4b4abb\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__application__ledger_service.rs.diff\n@@ -0,0 +1,97 @@\n+diff --git a/src-tauri/src/application/ledger_service.rs b/src-tauri/src/application/ledger_service.rs\n+new file mode 100644\n+index 0000000..19c4c6e\n+--- /dev/null\n++++ b/src-tauri/src/application/ledger_service.rs\n+@@ -0,0 +1,91 @@\n++use std::sync::Arc;\n++\n++use crate::data::{DailyRecordRepo, FaithTransactionRepo, RepoError, SqliteDb, UserRepo};\n++use crate::domain::{build_daily_record, calculate_daily, DailyRecord, DisciplineInput, FaithTransaction};\n++\n++pub struct FaithLedgerService {\n++    db: Arc<SqliteDb>,\n++}\n++\n++impl FaithLedgerService {\n++    pub fn new(db: Arc<SqliteDb>) -> Self {\n++        Self { db }\n++    }\n++\n++    pub fn upsert_daily_record(\n++        &self,\n++        user_id: &str,\n++        date: &str,"
+  },
+  ".merge-diffs/src-tauri__src__application__mod.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 13,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__application__mod.rs.diff b/.merge-diffs/src-tauri__src__application__mod.rs.diff\nnew file mode 100644\nindex 0000000..56bc6f7\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__application__mod.rs.diff\n@@ -0,0 +1,14 @@\n+diff --git a/src-tauri/src/application/mod.rs b/src-tauri/src/application/mod.rs\n+index cf7d015..22a76c1 100644\n+--- a/src-tauri/src/application/mod.rs\n++++ b/src-tauri/src/application/mod.rs\n+@@ -1,7 +1,9 @@\n+ // src-tauri/src/application/mod.rs\n+ \n+ pub mod faith_service;\n++pub mod ledger_service;\n+ pub mod task_service;\n+ \n+ pub use faith_service::FaithService;\n++pub use ledger_service::FaithLedgerService;\n+ pub use task_service::TaskService;"
+  },
+  ".merge-diffs/src-tauri__src__application__task_service.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 344,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__application__task_service.rs.diff b/.merge-diffs/src-tauri__src__application__task_service.rs.diff\nnew file mode 100644\nindex 0000000..f04cb24\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__application__task_service.rs.diff\n@@ -0,0 +1,345 @@\n+diff --git a/src-tauri/src/application/task_service.rs b/src-tauri/src/application/task_service.rs\n+index 179ba4e..a1ca7d2 100644\n+--- a/src-tauri/src/application/task_service.rs\n++++ b/src-tauri/src/application/task_service.rs\n+@@ -3,21 +3,24 @@\n+ \n+ use std::sync::Arc;\n+ \n+-use crate::data::{DailyRecordRepo, RepoError, SqliteDb, TaskRepo, UserRepo};\n++use crate::application::FaithLedgerService;\n++use crate::data::{DailyRecordRepo, RepoError, SqliteDb, TaskRepo, TaskSessionRepo, UserRepo};\n+ use crate::domain::{\n+     calc_task_bonus,\n+     DailyRecord, DailyStats, DisciplineInput,\n+-    Task, TaskCompleteResult, TaskStatus,\n++    Task, TaskCategory, TaskCompleteResult, TaskStatus,\n+ };\n+ \n+ /// Task management service — orchestrates domain logic and persistence.\n+ pub struct TaskService {\n+     db: Arc<SqliteDb>,\n++    ledger: Arc<FaithLedgerService>,\n+ }\n+ "
+  },
+  ".merge-diffs/src-tauri__src__data__repository.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 25,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__data__repository.rs.diff b/.merge-diffs/src-tauri__src__data__repository.rs.diff\nnew file mode 100644\nindex 0000000..d7f0122\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__data__repository.rs.diff\n@@ -0,0 +1,26 @@\n+diff --git a/src-tauri/src/data/repository.rs b/src-tauri/src/data/repository.rs\n+index 6622e4a..858f330 100644\n+--- a/src-tauri/src/data/repository.rs\n++++ b/src-tauri/src/data/repository.rs\n+@@ -1,7 +1,7 @@\n+ // src-tauri/src/data/repository.rs\n+ //! Repository trait definitions\n+ \n+-use crate::domain::{DailyRecord, Task, TaskStatus, User};\n++use crate::domain::{DailyRecord, FaithTransaction, Task, TaskStatus, User};\n+ \n+ /// Error type for data layer operations.\n+ #[derive(Debug, thiserror::Error)]\n+@@ -45,3 +45,12 @@ pub trait TaskRepo: Send + Sync {\n+     fn update(&self, task: &Task) -> Result<(), RepoError>;\n+     fn delete(&self, id: &str) -> Result<(), RepoError>;\n+ }\n++\n++pub trait FaithTransactionRepo: Send + Sync {\n++    fn insert(&self, tx: &FaithTransaction) -> Result<(), RepoError>;\n++}\n++\n++pub trait TaskSessionRepo: Send + Sync {\n++    fn start_session(&self, task_id: &str, start_ts: &str) -> Result<(), RepoError>;"
+  },
+  ".merge-diffs/src-tauri__src__data__schema.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 76,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__data__schema.rs.diff b/.merge-diffs/src-tauri__src__data__schema.rs.diff\nnew file mode 100644\nindex 0000000..ac57c5e\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__data__schema.rs.diff\n@@ -0,0 +1,77 @@\n+diff --git a/src-tauri/src/data/schema.rs b/src-tauri/src/data/schema.rs\n+index ee0c4a6..8270f76 100644\n+--- a/src-tauri/src/data/schema.rs\n++++ b/src-tauri/src/data/schema.rs\n+@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS users (\n+     nickname        TEXT NOT NULL DEFAULT '',\n+     cumulative_faith INTEGER NOT NULL DEFAULT 0,\n+     current_level   INTEGER NOT NULL DEFAULT 1,\n++    armor_points    INTEGER NOT NULL DEFAULT 0,\n+     created_at      TEXT NOT NULL,\n+     updated_at      TEXT NOT NULL\n+ );\n+@@ -46,14 +47,63 @@ CREATE TABLE IF NOT EXISTS tasks (\n+     status          TEXT NOT NULL,\n+     notes           TEXT NOT NULL DEFAULT '',\n+     created_at      TEXT NOT NULL,\n++    started_at      TEXT,\n+     completed_at    TEXT,\n++    duration_seconds INTEGER NOT NULL DEFAULT 0,\n++    ai_summary      TEXT,\n+     updated_at      TEXT NOT NULL\n+ );\n+ \n+ CREATE INDEX IF NOT EXISTS idx_tasks_user_status ON tasks(user_id, status);"
+  },
+  ".merge-diffs/src-tauri__src__data__sqlite.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 281,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__data__sqlite.rs.diff b/.merge-diffs/src-tauri__src__data__sqlite.rs.diff\nnew file mode 100644\nindex 0000000..b715e4e\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__data__sqlite.rs.diff\n@@ -0,0 +1,282 @@\n+diff --git a/src-tauri/src/data/sqlite.rs b/src-tauri/src/data/sqlite.rs\n+index 5a4e9bf..566870a 100644\n+--- a/src-tauri/src/data/sqlite.rs\n++++ b/src-tauri/src/data/sqlite.rs\n+@@ -4,8 +4,8 @@\n+ use std::sync::Mutex;\n+ \n+ use crate::data::schema::init_schema;\n+-use crate::data::repository::{DailyRecordRepo, RepoError, TaskRepo, UserRepo};\n+-use crate::domain::{DailyRecord, Task, TaskStatus, User};\n++use crate::data::repository::{DailyRecordRepo, FaithTransactionRepo, RepoError, TaskRepo, TaskSessionRepo, UserRepo};\n++use crate::domain::{DailyRecord, FaithTransaction, Task, TaskStatus, User};\n+ \n+ /// Shared SQLite connection pool wrapper.\n+ /// rusqlite Connection is not thread-safe; we use a Mutex (single writer).\n+@@ -47,7 +47,7 @@ impl UserRepo for SqliteDb {\n+     fn get(&self, user_id: &str) -> Result<Option<User>, RepoError> {\n+         self.with_conn(|conn| {\n+             let mut stmt = conn.prepare(\n+-                \"SELECT id, nickname, cumulative_faith, current_level, created_at, updated_at\n++                \"SELECT id, nickname, cumulative_faith, current_level, armor_points, created_at, updated_at\n+                  FROM users WHERE id = ?\",\n+             )?;\n+             let mut rows = stmt.query([user_id])?;"
+  },
+  ".merge-diffs/src-tauri__src__domain__faith.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 398,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__domain__faith.rs.diff b/.merge-diffs/src-tauri__src__domain__faith.rs.diff\nnew file mode 100644\nindex 0000000..9811d23\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__domain__faith.rs.diff\n@@ -0,0 +1,399 @@\n+diff --git a/src-tauri/src/domain/faith.rs b/src-tauri/src/domain/faith.rs\n+index 3c8af39..fa0d7a2 100644\n+--- a/src-tauri/src/domain/faith.rs\n++++ b/src-tauri/src/domain/faith.rs\n+@@ -6,21 +6,21 @@ use super::models::{DailyRecord, DisciplineInput, FaithBreakdown};\n+ /// Calculate survival faith (work) based on minutes worked.\n+ /// Tiers (integer minutes):\n+ ///   0 – 119 min  → 0\n+-/// 120 – 239 min  → 10\n+-/// 240 – 359 min  → 20\n+-/// 360 – 479 min  → 30\n+-/// 480+           → 40\n++/// 120 – 239 min  → 100\n++/// 240 – 359 min  → 200\n++/// 360 – 479 min  → 300\n++/// 480+           → 400\n+ pub fn calc_survival(minutes: i32) -> i32 {\n+     if minutes < 120 {\n+         0\n+     } else if minutes < 240 {\n+-        10\n++        100\n+     } else if minutes < 360 {\n+-        20"
+  },
+  ".merge-diffs/src-tauri__src__domain__level.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 184,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__domain__level.rs.diff b/.merge-diffs/src-tauri__src__domain__level.rs.diff\nnew file mode 100644\nindex 0000000..deb7df2\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__domain__level.rs.diff\n@@ -0,0 +1,185 @@\n+diff --git a/src-tauri/src/domain/level.rs b/src-tauri/src/domain/level.rs\n+index 01d86b8..e51b750 100644\n+--- a/src-tauri/src/domain/level.rs\n++++ b/src-tauri/src/domain/level.rs\n+@@ -4,23 +4,23 @@\n+ use super::models::Level;\n+ \n+ /// All 15 levels indexed by level number (1..=15).\n+-/// Lv1 threshold = 0, Lv15 threshold = 109500.\n++/// Lv1 threshold = 0, Lv15 threshold = 1095000.\n+ const LEVELS: &[Level] = &[\n+     Level { level: 1,  threshold: 0,       title: \"见习牛马\" },\n+-    Level { level: 2,  threshold: 1_500,    title: \"工位信徒\" },\n+-    Level { level: 3,  threshold: 4_000,    title: \"初级供奉者\" },\n+-    Level { level: 4,  threshold: 8_000,    title: \"稳定产出者\" },\n+-    Level { level: 5,  threshold: 13_500,   title: \"自律门徒\" },\n+-    Level { level: 6,  threshold: 20_500,   title: \"双修学徒\" },\n+-    Level { level: 7,  threshold: 29_000,   title: \"工时祭司\" },\n+-    Level { level: 8,  threshold: 39_500,   title: \"苦修执行官\" },\n+-    Level { level: 9,  threshold: 52_000,    title: \"连轴修行者\" },\n+-    Level { level: 10, threshold: 66_500,    title: \"钢铁牛马\" },\n+-    Level { level: 11, threshold: 82_500,    title: \"卷力使徒\" },\n+-    Level { level: 12, threshold: 94_500,    title: \"精进主教\" },\n+-    Level { level: 13, threshold: 102_500,   title: \"福报传道者\" },"
+  },
+  ".merge-diffs/src-tauri__src__domain__models.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 27,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__domain__models.rs.diff b/.merge-diffs/src-tauri__src__domain__models.rs.diff\nnew file mode 100644\nindex 0000000..d26202f\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__domain__models.rs.diff\n@@ -0,0 +1,28 @@\n+diff --git a/src-tauri/src/domain/models.rs b/src-tauri/src/domain/models.rs\n+index afa1e2b..e5bf91d 100644\n+--- a/src-tauri/src/domain/models.rs\n++++ b/src-tauri/src/domain/models.rs\n+@@ -71,6 +71,7 @@ pub struct User {\n+     pub nickname: String,\n+     pub cumulative_faith: i64,\n+     pub current_level: i32,\n++    pub armor_points: i32,\n+     pub created_at: String,\n+     pub updated_at: String,\n+ }\n+@@ -94,3 +95,15 @@ pub struct FaithStatus {\n+     pub next_threshold: Option<i64>,\n+     pub today: Option<DailyRecord>,\n+ }\n++\n++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]\n++pub struct FaithTransaction {\n++    pub id: Option<i64>,\n++    pub user_id: String,\n++    pub ts: String,\n++    pub delta: i32,\n++    pub armor_delta: i32,"
+  },
+  ".merge-diffs/src-tauri__src__domain__task.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 24,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__domain__task.rs.diff b/.merge-diffs/src-tauri__src__domain__task.rs.diff\nnew file mode 100644\nindex 0000000..c4d62d8\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__domain__task.rs.diff\n@@ -0,0 +1,25 @@\n+diff --git a/src-tauri/src/domain/task.rs b/src-tauri/src/domain/task.rs\n+index da09344..b7871ba 100644\n+--- a/src-tauri/src/domain/task.rs\n++++ b/src-tauri/src/domain/task.rs\n+@@ -16,7 +16,8 @@ pub enum TaskCategory {\n+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]\n+ #[serde(rename_all = \"lowercase\")]\n+ pub enum TaskStatus {\n+-    Active,\n++    Running,\n++    Paused,\n+     Completed,\n+     Abandoned,\n+ }\n+@@ -34,7 +35,10 @@ pub struct Task {\n+     pub status: TaskStatus,\n+     pub notes: String,\n+     pub created_at: String,\n++    pub started_at: Option<String>,\n+     pub completed_at: Option<String>,\n++    pub duration_seconds: i64,\n++    pub ai_summary: Option<String>,\n+     pub updated_at: String,\n+ }"
+  },
+  ".merge-diffs/src-tauri__src__lib.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 13,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__lib.rs.diff b/.merge-diffs/src-tauri__src__lib.rs.diff\nnew file mode 100644\nindex 0000000..c2635db\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__lib.rs.diff\n@@ -0,0 +1,14 @@\n+diff --git a/src-tauri/src/lib.rs b/src-tauri/src/lib.rs\n+index e90f87c..498bff4 100644\n+--- a/src-tauri/src/lib.rs\n++++ b/src-tauri/src/lib.rs\n+@@ -4,7 +4,9 @@\n+ pub mod domain;\n+ pub mod data;\n+ pub mod application;\n++#[cfg(feature = \"desktop\")]\n+ pub mod tauri;\n+ \n+ pub use data::SqliteDb;\n++#[cfg(feature = \"desktop\")]\n+ pub use tauri::AppState;"
+  },
+  ".merge-diffs/src-tauri__src__main.rs.diff": {
+    "new": true,
+    "deleted": false,
+    "added": 68,
+    "removed": 0,
+    "head": "diff --git a/.merge-diffs/src-tauri__src__main.rs.diff b/.merge-diffs/src-tauri__src__main.rs.diff\nnew file mode 100644\nindex 0000000..96e9c6c\n--- /dev/null\n+++ b/.merge-diffs/src-tauri__src__main.rs.diff\n@@ -0,0 +1,69 @@\n+diff --git a/src-tauri/src/main.rs b/src-tauri/src/main.rs\n+index 6c3f084..ce9e65e 100644\n+--- a/src-tauri/src/main.rs\n++++ b/src-tauri/src/main.rs\n+@@ -109,7 +109,9 @@ async fn get_tasks(\n+     status: Option<String>,\n+ ) -> Result<Vec<Task>, String> {\n+     let status_filter = status.map(|s| match s.as_str() {\n+-        \"active\" => Some(TaskStatus::Active),\n++        \"active\" => Some(TaskStatus::Paused),\n++        \"running\" => Some(TaskStatus::Running),\n++        \"paused\" => Some(TaskStatus::Paused),\n+         \"completed\" => Some(TaskStatus::Completed),\n+         \"abandoned\" => Some(TaskStatus::Abandoned),\n+         _ => None,\n+@@ -184,6 +186,42 @@ async fn delete_task(state: tauri::State<'_, AppState>, id: String) -> Result<bo\n+         .map_err(|e| e.to_string())\n+ }\n+ \n++/// 12. start_task — start timing a task (running)\n++#[tauri::command]\n++async fn start_task(state: tauri::State<'_, AppState>, id: String) -> Result<Task, String> {\n++    state\n++        .task_service"
+  }
+}
