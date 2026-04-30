@@ -47,7 +47,7 @@ impl UserRepo for SqliteDb {
     fn get(&self, user_id: &str) -> Result<Option<User>, RepoError> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, nickname, cumulative_faith, current_level, created_at, updated_at
+                "SELECT id, nickname, cumulative_faith, current_level, armr, total_armr, created_at, updated_at
                  FROM users WHERE id = ?",
             )?;
             let mut rows = stmt.query([user_id])?;
@@ -57,8 +57,10 @@ impl UserRepo for SqliteDb {
                     nickname: row.get(1)?,
                     cumulative_faith: row.get(2)?,
                     current_level: row.get(3)?,
-                    created_at: row.get(4)?,
-                    updated_at: row.get(5)?,
+                    armor: row.get(4)?,
+                    total_armor: row.get(5)?,
+                    created_at: row.get(6)?,
+                    updated_at: row.get(7)?,
                 }))
             } else {
                 Ok(None)
@@ -69,18 +71,22 @@ impl UserRepo for SqliteDb {
     fn upsert(&self, user: &User) -> Result<(), RepoError> {
         self.with_conn(|conn| {
             conn.execute(
-                "INSERT INTO users (id, nickname, cumulative_faith, current_level, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                "INSERT INTO users (id, nickname, cumulative_faith, current_level, armr, total_armr, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
                  ON CONFLICT(id) DO UPDATE SET
                    nickname = excluded.nickname,
                    cumulative_faith = excluded.cumulative_faith,
                    current_level = excluded.current_level,
+                   armr = excluded.armr,
+                   total_armr = excluded.total_armr,
                    updated_at = excluded.updated_at",
                 rusqlite::params![
                     user.id,
                     user.nickname,
                     user.cumulative_faith,
                     user.current_level,
+                    user.armor,
+                    user.total_armor,
                     user.created_at,
                     user.updated_at,
                 ],
@@ -145,8 +151,9 @@ impl DailyRecordRepo for SqliteDb {
                     discipline_a: row.get(12)?,
                     discipline_b: row.get(13)?,
                     discipline_c: row.get(14)?,
-                    created_at: row.get(15)?,
-                    updated_at: row.get(16)?,
+                    tasks_completed: row.get(15)?,
+                    created_at: row.get(16)?,
+                    updated_at: row.get(17)?,
                 }))
             } else {
                 Ok(None)
@@ -162,8 +169,9 @@ impl DailyRecordRepo for SqliteDb {
                     survival_faith, progress_faith, discipline_faith, total_faith,
                     break_count, leave_record, close_record,
                     discipline_a, discipline_b, discipline_c,
+                    tasks_completed,
                     created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
                  ON CONFLICT(user_id, date) DO UPDATE SET
                    work_minutes = excluded.work_minutes,
                    study_minutes = excluded.study_minutes,
@@ -177,6 +185,7 @@ impl DailyRecordRepo for SqliteDb {
                    discipline_a = excluded.discipline_a,
                    discipline_b = excluded.discipline_b,
                    discipline_c = excluded.discipline_c,
+                   tasks_completed = excluded.tasks_completed,
                    updated_at = excluded.updated_at",
                 rusqlite::params![
                     record.user_id,
@@ -193,6 +202,7 @@ impl DailyRecordRepo for SqliteDb {
                     record.discipline_a,
                     record.discipline_b,
                     record.discipline_c,
+                    record.tasks_completed,
                     record.created_at,
                     record.updated_at,
                 ],
@@ -206,12 +216,13 @@ impl TaskRepo for SqliteDb {
     fn create(&self, task: &Task) -> Result<(), RepoError> {
         self.with_conn(|conn| {
             conn.execute(
-                "INSERT INTO tasks (id, user_id, title, description, category, estimated_minutes,
+                "INSERT INTO tasks (id, user_id, date, title, description, category, estimated_minutes,
                  actual_minutes, status, notes, created_at, completed_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
                 rusqlite::params![
                     task.id,
                     task.user_id,
+                    task.date,
                     task.title,
                     task.description,
                     serde_json::to_string(&task.category).unwrap(),
@@ -231,7 +242,7 @@ impl TaskRepo for SqliteDb {
     fn get(&self, id: &str) -> Result<Option<Task>, RepoError> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, user_id, title, description, category, estimated_minutes,
+                "SELECT id, user_id, date, title, description, category, estimated_minutes,
                         actual_minutes, status, notes, created_at, completed_at, updated_at
                  FROM tasks WHERE id = ?",
             )?;
@@ -250,7 +261,7 @@ impl TaskRepo for SqliteDb {
                 Some(s) => {
                     let status_str = serde_json::to_string(&s).unwrap();
                     let mut stmt = conn.prepare(
-                        "SELECT id, user_id, title, description, category, estimated_minutes,
+                        "SELECT id, user_id, date, title, description, category, estimated_minutes,
                                 actual_minutes, status, notes, created_at, completed_at, updated_at
                          FROM tasks WHERE user_id = ? AND status = ?",
                     )?;
@@ -263,7 +274,7 @@ impl TaskRepo for SqliteDb {
                 }
                 None => {
                     let mut stmt = conn.prepare(
-                        "SELECT id, user_id, title, description, category, estimated_minutes,
+                        "SELECT id, user_id, date, title, description, category, estimated_minutes,
                                 actual_minutes, status, notes, created_at, completed_at, updated_at
                          FROM tasks WHERE user_id = ?",
                     )?;
@@ -282,10 +293,11 @@ impl TaskRepo for SqliteDb {
     fn update(&self, task: &Task) -> Result<(), RepoError> {
         self.with_conn(|conn| {
             conn.execute(
-                "UPDATE tasks SET title=?, description=?, category=?, estimated_minutes=?,
+                "UPDATE tasks SET date=?, title=?, description=?, category=?, estimated_minutes=?,
                  actual_minutes=?, status=?, notes=?, completed_at=?, updated_at=?
                  WHERE id=?",
                 rusqlite::params![
+                    task.date,
                     task.title,
                     task.description,
                     serde_json::to_string(&task.category).unwrap(),
@@ -315,20 +327,21 @@ fn row_to_task(row: &rusqlite::Row) -> Result<Task, RepoError> {
     Ok(Task {
         id: row.get(0)?,
         user_id: row.get(1)?,
-        title: row.get(2)?,
-        description: row.get(3)?,
-        category: serde_json::from_str(&row.get::<_, String>(4)?).map_err(|e| {
+        date: row.get(2)?,
+        title: row.get(3)?,
+        description: row.get(4)?,
+        category: serde_json::from_str(&row.get::<_, String>(5)?).map_err(|e| {
             RepoError::Sqlite(rusqlite::Error::InvalidParameterName(e.to_string()))
         })?,
-        estimated_minutes: row.get(5)?,
-        actual_minutes: row.get(6)?,
-        status: serde_json::from_str(&row.get::<_, String>(7)?).map_err(|e| {
+        estimated_minutes: row.get(6)?,
+        actual_minutes: row.get(7)?,
+        status: serde_json::from_str(&row.get::<_, String>(8)?).map_err(|e| {
             RepoError::Sqlite(rusqlite::Error::InvalidParameterName(e.to_string()))
         })?,
-        notes: row.get(8)?,
-        created_at: row.get(9)?,
-        completed_at: row.get(10)?,
-        updated_at: row.get(11)?,
+        notes: row.get(9)?,
+        created_at: row.get(10)?,
+        completed_at: row.get(11)?,
+        updated_at: row.get(12)?,
     })
 }
 

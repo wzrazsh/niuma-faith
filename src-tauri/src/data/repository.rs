@@ -17,6 +17,9 @@ pub enum RepoError {
 
     #[error("Task not found: {0}")]
     TaskNotFound(String),
+
+    #[error("HistoricalEditNotAllowed: cannot edit task on past date {0}")]
+    HistoricalEditNotAllowed(String),
 }
 
 /// Repository for user entities.

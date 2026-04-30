@@ -1,79 +1,51 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
-import { useTaskStore } from "@/stores/task";
+import { onMounted, computed } from "vue";
 import { useFaithStore } from "@/stores/faith";
 
-const taskStore = useTaskStore();
 const faithStore = useFaithStore();
 
 onMounted(async () => {
-  const today = new Date().toISOString().slice(0, 10);
-  await taskStore.fetchDailyStats(today);
+  await faithStore.fetchStatus();
 });
 
-const stats = () => taskStore.dailyStats;
+const faithStatus = computed(() => faithStore.faithStatus);
+const todayRecord = computed(() => faithStatus.value?.today ?? null);
 </script>
 
 <template>
   <section class="faith-dashboard">
     <h3 class="panel-title">今日信仰汇总</h3>
 
-    <div v-if="stats()" class="faith-breakdown">
+    <div v-if="todayRecord" class="faith-breakdown">
       <div class="breakdown-row">
         <span class="row-label">生存信仰</span>
-        <span class="row-value survival">
-          {{ stats()!.survival_faith - stats()!.task_bonus_work }}
-          <span v-if="stats()!.task_bonus_work > 0" class="bonus-inline">+{{ stats()!.task_bonus_work }}</span>
-        </span>
+        <span class="row-value survival">{{ todayRecord.survival_faith }}</span>
       </div>
 
       <div class="breakdown-row">
         <span class="row-label">精进信仰</span>
-        <span class="row-value progress">
-          {{ stats()!.progress_faith - stats()!.task_bonus_study }}
-          <span v-if="stats()!.task_bonus_study > 0" class="bonus-inline">+{{ stats()!.task_bonus_study }}</span>
-        </span>
+        <span class="row-value progress">{{ todayRecord.progress_faith }}</span>
       </div>
 
       <div class="breakdown-row">
         <span class="row-label">戒律信仰</span>
-        <span class="row-value discipline">{{ stats()!.discipline_faith }}</span>
+        <span class="row-value discipline">{{ todayRecord.discipline_faith }}</span>
       </div>
 
       <div class="row-divider"></div>
 
       <div class="breakdown-row total-row">
         <span class="row-label">今日总计</span>
-        <span class="row-value total">{{ stats()!.total_faith }}</span>
+        <span class="row-value total">{{ todayRecord.total_faith }}</span>
       </div>
 
       <div class="task-summary">
         <span class="task-summary-label">完成任务</span>
-        <span class="task-summary-value">{{ stats()!.tasks_completed }} 个</span>
+        <span class="task-summary-value">{{ todayRecord.tasks_completed }} 个</span>
       </div>
     </div>
 
-    <div v-else-if="faithStore.todayRecord" class="faith-breakdown">
-      <div class="breakdown-row">
-        <span class="row-label">生存信仰</span>
-        <span class="row-value survival">{{ faithStore.todayFaith.survival_faith }}</span>
-      </div>
-      <div class="breakdown-row">
-        <span class="row-label">精进信仰</span>
-        <span class="row-value progress">{{ faithStore.todayFaith.progress_faith }}</span>
-      </div>
-      <div class="breakdown-row">
-        <span class="row-label">戒律信仰</span>
-        <span class="row-value discipline">{{ faithStore.todayFaith.discipline_faith }}</span>
-      </div>
-      <div class="row-divider"></div>
-      <div class="breakdown-row total-row">
-        <span class="row-label">今日总计</span>
-        <span class="row-value total">{{ faithStore.todayFaith.total_faith }}</span>
-      </div>
-    </div>
-
-    <p v-else class="no-record">今日暂无打卡记录</p>
+    <p v-else class="no-record">今日暂无任务记录</p>
   </section>
 </template>
 

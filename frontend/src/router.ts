@@ -1,12 +1,10 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
-import MainView from './components/MainView.vue';
+import Dashboard from './components/Dashboard.vue';
 import FloatingWidget from './components/FloatingWidget.vue';
-import TasksPage from './components/TasksPage.vue';
 
 const routes = [
-  { path: '/', component: MainView },
+  { path: '/', component: Dashboard },
   { path: '/floating', component: FloatingWidget },
-  { path: '/tasks', component: TasksPage },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ];
 

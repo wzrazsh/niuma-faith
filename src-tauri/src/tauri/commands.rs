@@ -1,34 +1,10 @@
 // src-tauri/src/tauri/commands.rs
 //! Tauri command handlers (MVP: 4 commands)
 
-use crate::domain::{DailyRecord, DisciplineInput, FaithStatus, User};
+use crate::domain::{DailyRecord, FaithStatus, User};
 use crate::tauri::state::AppState;
 
-/// 1. check_in — record today's work + study minutes + discipline
-///
-/// Returns the updated FaithStatus including today's breakdown.
-#[tauri::command]
-pub async fn check_in(
-    state: tauri::State<'_, AppState>,
-    user_id: String,
-    work_minutes: i32,
-    study_minutes: i32,
-    break_count: i32,
-    leave_record: i32,
-    close_record: i32,
-) -> Result<FaithStatus, String> {
-    let discipline = DisciplineInput {
-        break_count,
-        leave_record,
-        close_record,
-    };
-    state
-        .faith_service
-        .check_in(&user_id, work_minutes, study_minutes, discipline)
-        .map_err(|e| e.to_string())
-}
-
-/// 2. get_status — retrieve current cumulative faith + level + today's record
+/// 1. get_status — retrieve current cumulative faith + level + today's record
 #[tauri::command]
 pub async fn get_status(state: tauri::State<'_, AppState>, user_id: String) -> Result<FaithStatus, String> {
     state
@@ -56,4 +32,29 @@ pub async fn get_or_create_user(state: tauri::State<'_, AppState>) -> Result<Use
         .faith_service
         .get_or_create_user()
         .map_err(|e| e.to_string())
+}
+
+/// 5. is_process_running — check if a process is running (Windows only)
+#[tauri::command]
+pub async fn is_process_running(
+    _state: tauri::State<'_, AppState>,
+    app_name: String,
+) -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let output = std::process::Command::new("tasklist")
+            .args(&["/FI", &format!("IMAGENAME eq {}", app_name), "/NH"])
+            .output()
+            .map_err(|e| format!("Failed to execute tasklist: {}", e))?;
+        
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // If output contains the process name, it's running
+        Ok(stdout.contains(&app_name))
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Linux/Mac implementation (placeholder)
+        Err("Unsupported platform".to_string())
+    }
 }

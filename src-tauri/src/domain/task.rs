@@ -26,6 +26,7 @@ pub enum TaskStatus {
 pub struct Task {
     pub id: String,
     pub user_id: String,
+    pub date: String, // YYYY-MM-DD in UTC
     pub title: String,
     pub description: String,
     pub category: TaskCategory,
@@ -59,13 +60,13 @@ pub struct DailyStats {
 /// Work/Study tasks: +5 faith per hour (rounded up to full hours)
 /// Other tasks: +2 faith per hour
 /// Minimum bonus is one hour's worth (5 or 2).
-pub fn calc_task_bonus(category: TaskCategory, estimated_minutes: i32) -> i32 {
+pub fn calc_task_bonus(category: TaskCategory, actual_minutes: i32) -> i32 {
     let rate = match category {
         TaskCategory::Work => 5,
         TaskCategory::Study => 5,
         TaskCategory::Other => 2,
     };
-    let hours = ((estimated_minutes as i32) / 60).max(1);
+    let hours = ((actual_minutes as i32) / 60).max(1);
     hours * rate
 }
 
@@ -90,7 +91,7 @@ mod tests {
 
     #[test]
     fn task_bonus_work_30min_rounds_to_1h() {
-        // minimum 1 hour even if estimated < 60 min
+        // minimum 1 hour even if actual < 60 min
         assert_eq!(calc_task_bonus(TaskCategory::Work, 30), 5);
     }
 

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS daily_records (
     work_minutes    INTEGER NOT NULL DEFAULT 0,
     study_minutes   INTEGER NOT NULL DEFAULT 0,
     survival_faith  INTEGER NOT NULL DEFAULT 0,
-    progress_faith  INTEGER NOT NULL DEFAULT 0,
+    progress_faith INTEGER NOT NULL DEFAULT 0,
     discipline_faith INTEGER NOT NULL DEFAULT 0,
     total_faith     INTEGER NOT NULL DEFAULT 0,
     break_count     INTEGER NOT NULL DEFAULT 0,
@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS daily_records (
     discipline_a    INTEGER NOT NULL DEFAULT 0,
     discipline_b    INTEGER NOT NULL DEFAULT 0,
     discipline_c    INTEGER NOT NULL DEFAULT 0,
+    tasks_completed INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL,
     UNIQUE(user_id, date)
@@ -29,6 +30,8 @@ CREATE TABLE IF NOT EXISTS users (
     nickname        TEXT NOT NULL DEFAULT '',
     cumulative_faith INTEGER NOT NULL DEFAULT 0,
     current_level   INTEGER NOT NULL DEFAULT 1,
+    armr            INTEGER NOT NULL DEFAULT 0,
+    total_armr      INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
@@ -38,6 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_daily_user_date ON daily_records(user_id, date);
 CREATE TABLE IF NOT EXISTS tasks (
     id              TEXT PRIMARY KEY,
     user_id         TEXT NOT NULL,
+    date            TEXT NOT NULL DEFAULT '',
     title           TEXT NOT NULL,
     description     TEXT NOT NULL DEFAULT '',
     category        TEXT NOT NULL,

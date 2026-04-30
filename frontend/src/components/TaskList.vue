@@ -4,12 +4,16 @@ import { useTaskStore } from "@/stores/task";
 import type { Task } from "@/types";
 import TaskForm from "./TaskForm.vue";
 
+defineProps<{
+  readonly?: boolean;
+}>();
+
 const store = useTaskStore();
 const showForm = ref(false);
 const editingTask = ref<Task | null>(null);
 
 onMounted(() => {
-  store.fetchTasks();
+  store.fetchTasksByDate(store.selectedDate);
 });
 
 function openCreateForm() {
@@ -70,7 +74,8 @@ function categoryLabel(cat: string): string {
           {{ f === 'all' ? '全部' : f === 'active' ? '进行中' : f === 'completed' ? '已完成' : '已放弃' }}
         </button>
       </div>
-      <button class="add-btn" @click="openCreateForm">+ 添加任务</button>
+      <button v-if="!readonly" class="add-btn" @click="openCreateForm">+ 添加任务</button>
+      <span v-else class="readonly-indicator">只读</span>
     </div>
 
     <div v-if="store.isLoading" class="loading">加载中...</div>
@@ -90,7 +95,7 @@ function categoryLabel(cat: string): string {
           </div>
           <p v-if="task.description" class="task-desc">{{ task.description }}</p>
         </div>
-        <div class="task-actions">
+        <div v-if="!readonly" class="task-actions">
           <template v-if="task.status === 'active'">
             <button class="action-btn complete" @click="handleComplete(task)">完成</button>
             <button class="action-btn edit" @click="openEditForm(task)">编辑</button>
@@ -101,7 +106,7 @@ function categoryLabel(cat: string): string {
       </li>
     </ul>
 
-    <TaskForm v-if="showForm" :task="editingTask" @close="closeForm" />
+    <TaskForm v-if="showForm && !readonly" :task="editingTask" @close="closeForm" />
   </section>
 </template>
 
@@ -155,6 +160,12 @@ function categoryLabel(cat: string): string {
 .add-btn:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
+}
+
+.readonly-indicator {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
 .loading, .empty {

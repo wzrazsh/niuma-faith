@@ -60,6 +60,8 @@ pub struct DailyRecord {
     pub discipline_a: i32,
     pub discipline_b: i32,
     pub discipline_c: i32,
+    // Tasks completed today
+    pub tasks_completed: i32,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -71,6 +73,9 @@ pub struct User {
     pub nickname: String,
     pub cumulative_faith: i64,
     pub current_level: i32,
+    // Armor system (2.0)
+    pub armor: i64,        // Max armor based on level tier
+    pub total_armor: i64,  // Current remaining armor
     pub created_at: String,
     pub updated_at: String,
 }
@@ -93,4 +98,18 @@ pub struct FaithStatus {
     pub progress_to_next: i64,
     pub next_threshold: Option<i64>,
     pub today: Option<DailyRecord>,
+    // Armor system (2.0)
+    pub armor: i64,
+    pub total_armor: i64,
+}
+
+/// Calculate armor based on level tier (2.0 version)
+/// Lv2-Lv5: 2000, Lv6-Lv10: 4000, Lv11-Lv15: 6000
+pub fn calc_armor(current_level: i32) -> i64 {
+    match current_level {
+        2..=5 => 2_000,
+        6..=10 => 4_000,
+        11..=15 => 6_000,
+        _ => 0,
+    }
 }

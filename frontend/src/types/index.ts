@@ -5,6 +5,8 @@ export interface User {
   nickname: string;
   cumulative_faith: number;
   current_level: number;
+  armor: number;
+  total_armor: number;
   created_at: string;
   updated_at: string;
 }
@@ -31,6 +33,7 @@ export interface DailyRecord {
   discipline_a: number;
   discipline_b: number;
   discipline_c: number;
+  tasks_completed: number;
   created_at: string;
   updated_at: string;
 }
@@ -47,6 +50,8 @@ export interface FaithStatus {
   progress_to_next: number;
   next_threshold: number | null;
   today: DailyRecord | null;
+  armor: number;
+  total_armor: number;
 }
 
 // --- Task types ---

@@ -1,8 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import type { FaithStatus, DailyRecord, User, DisciplineInput } from "@/types";
+import type { FaithStatus, DailyRecord, User } from "@/types";
 import {
-  invoke_check_in,
   invoke_get_status,
   invoke_get_today_record,
   invoke_get_or_create_user,
@@ -58,20 +57,6 @@ export const useFaithStore = defineStore("faith", () => {
     }
   }
 
-  async function checkIn(workMinutes: number, studyMinutes: number, discipline: DisciplineInput) {
-    try {
-      isLoading.value = true;
-      error.value = null;
-      const result = await invoke_check_in(workMinutes, studyMinutes, discipline);
-      faithStatus.value = result;
-    } catch (e) {
-      error.value = String(e);
-      throw e;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
   async function fetchStatus() {
     try {
       isLoading.value = true;
@@ -120,7 +105,6 @@ export const useFaithStore = defineStore("faith", () => {
     cumulativeFaith,
     // Actions
     init,
-    checkIn,
     fetchStatus,
     fetchTodayRecord,
     ensureUser,
