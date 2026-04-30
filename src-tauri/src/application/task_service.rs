@@ -5,14 +5,26 @@ use std::sync::Arc;
 
 use crate::data::{DailyRecordRepo, RepoError, SqliteDb, TaskRepo, UserRepo};
 use crate::domain::{
+    calc_survival, calc_progress,
     calc_task_bonus,
     DailyRecord, DailyStats, DisciplineInput,
-    Task, TaskCompleteResult, TaskStatus,
+    Task, TaskCompleteResult, TaskStatus, TaskCategory,
 };
 
 /// Task management service — orchestrates domain logic and persistence.
 pub struct TaskService {
     db: Arc<SqliteDb>,
+}
+
+/// US-002: Returns true if the given date string equals today (local time).
+fn is_today(date: &str) -> bool {
+    date == chrono::Local::now().format("%Y-%m-%d").to_string()
+}
+
+/// US-002: Returns true if the given date string is in the past (local time).
+/// Uses Local time so the user's "today" matches what they see in the calendar.
+fn is_historical(date: &str) -> bool {
+    date < chrono::Local::now().format("%Y-%m-%d").to_string().as_str()
 }
 
 impl TaskService {
@@ -21,6 +33,7 @@ impl TaskService {
     }
 
     /// Create a new task for a user.
+    /// If date is None, uses today (UTC).
     pub fn create_task(
         &self,
         user_id: &str,
@@ -28,11 +41,14 @@ impl TaskService {
         description: String,
         category: TaskCategory,
         estimated_minutes: i32,
+        date: Option<String>,
     ) -> Result<Task, RepoError> {
-        let now = chrono::Local::now().to_rfc3339();
+        let now = chrono::Utc::now();
+        let now_ts = now.to_rfc3339();
         let task = Task {
             id: uuid_simple(),
             user_id: user_id.to_string(),
+            date: date.unwrap_or_else(|| now.format("%Y-%m-%d").to_string()),
             title,
             description,
             category,
@@ -40,9 +56,9 @@ impl TaskService {
             actual_minutes: 0,
             status: TaskStatus::Active,
             notes: String::new(),
-            created_at: now.clone(),
+            created_at: now_ts.clone(),
             completed_at: None,
-            updated_at: now,
+            updated_at: now_ts,
         };
         TaskRepo::create(&*self.db, &task)?;
         Ok(task)
@@ -58,37 +74,49 @@ impl TaskService {
         TaskRepo::get_by_user(&*self.db, user_id, status)
     }
 
-    /// Update a task's fields (not status).
+    /// Update a task's fields (including status and actual_minutes).
     pub fn update_task(
         &self,
         id: &str,
         title: Option<String>,
         description: Option<String>,
         estimated_minutes: Option<i32>,
+        actual_minutes: Option<i32>,
         notes: Option<String>,
+        status: Option<TaskStatus>,
     ) -> Result<Task, RepoError> {
         let task = TaskRepo::get(&*self.db, id)?
             .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
 
+        // US-002: prevent editing historical tasks
+        if is_historical(&task.date) {
+            return Err(RepoError::HistoricalEditNotAllowed(task.date.clone()));
+        }
+
         let updated = Task {
             id: task.id,
             user_id: task.user_id,
+            date: task.date,
             title: title.unwrap_or(task.title),
             description: description.unwrap_or(task.description),
             category: task.category,
             estimated_minutes: estimated_minutes.unwrap_or(task.estimated_minutes),
-            actual_minutes: task.actual_minutes,
-            status: task.status,
+            actual_minutes: actual_minutes.unwrap_or(task.actual_minutes),
+            status: status.unwrap_or(task.status),
             notes: notes.unwrap_or(task.notes),
             created_at: task.created_at,
-            completed_at: task.completed_at,
-            updated_at: chrono::Local::now().to_rfc3339(),
+            completed_at: if status == Some(TaskStatus::Completed) {
+                Some(chrono::Utc::now().to_rfc3339())
+            } else {
+                task.completed_at
+            },
+            updated_at: chrono::Utc::now().to_rfc3339(),
         };
         TaskRepo::update(&*self.db, &updated)?;
         Ok(updated)
     }
 
-    /// Complete a task — marks it done, calculates bonus faith, upserts daily record.
+    /// Complete a task — marks it done, recalculates daily faith.
     /// Returns the updated task and the bonus faith granted.
     pub fn complete_task(
         &self,
@@ -98,16 +126,21 @@ impl TaskService {
         let task = TaskRepo::get(&*self.db, id)?
             .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
 
-        let bonus = calc_task_bonus(task.category, task.estimated_minutes);
+        // US-002: prevent completing historical tasks
+        if is_historical(&task.date) {
+            return Err(RepoError::HistoricalEditNotAllowed(task.date.clone()));
+        }
 
-        let now = chrono::Local::now();
+        let now = chrono::Utc::now();
         let now_ts = now.to_rfc3339();
-        let date = now.format("%Y-%m-%d").to_string();
+        let date = task.date.clone();
         let user_id = task.user_id.clone();
 
+        // Update task status to Completed
         let completed = Task {
             id: task.id,
             user_id: task.user_id,
+            date: task.date,
             title: task.title,
             description: task.description,
             category: task.category,
@@ -121,13 +154,17 @@ impl TaskService {
         };
         TaskRepo::update(&*self.db, &completed)?;
 
-        // Apply bonus faith to today's record
-        self.apply_task_bonus(&user_id, &date, task.category, bonus)?;
+        // Recalculate daily faith from all completed tasks of the day
+        self.rebuild_daily_record(&user_id, &date)?;
+
+        // Calculate bonus for returning to frontend
+        let bonus = calc_task_bonus(completed.category, actual_minutes);
+        let bonus_category = completed.category;
 
         Ok(TaskCompleteResult {
             task: completed,
             bonus_faith: bonus,
-            bonus_category: task.category,
+            bonus_category,
         })
     }
 
@@ -136,9 +173,15 @@ impl TaskService {
         let task = TaskRepo::get(&*self.db, id)?
             .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
 
+        // US-002: prevent abandoning historical tasks
+        if is_historical(&task.date) {
+            return Err(RepoError::HistoricalEditNotAllowed(task.date.clone()));
+        }
+
         let updated = Task {
             id: task.id,
             user_id: task.user_id,
+            date: task.date,
             title: task.title,
             description: task.description,
             category: task.category,
@@ -148,7 +191,7 @@ impl TaskService {
             notes: task.notes,
             created_at: task.created_at,
             completed_at: task.completed_at,
-            updated_at: chrono::Local::now().to_rfc3339(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
         };
         TaskRepo::update(&*self.db, &updated)?;
         Ok(updated)
@@ -156,57 +199,129 @@ impl TaskService {
 
     /// Delete a task permanently.
     pub fn delete_task(&self, id: &str) -> Result<bool, RepoError> {
+        // US-002: prevent deleting historical tasks
+        let task = TaskRepo::get(&*self.db, id)?
+            .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
+        if is_historical(&task.date) {
+            return Err(RepoError::HistoricalEditNotAllowed(task.date.clone()));
+        }
         TaskRepo::delete(&*self.db, id)?;
         Ok(true)
     }
 
-    /// Get daily statistics including task bonus breakdown.
+    /// Get daily statistics by aggregating tasks for a given date.
+/// US-003: REPLACES old get_daily_stats that used DailyRecord.
+/// Now uses task date field and actual_minutes for all calculations.
     pub fn get_daily_stats(&self, user_id: &str, date: &str) -> Result<DailyStats, RepoError> {
-        let today_record = DailyRecordRepo::get(&*self.db, user_id, date)?;
+        let tasks = self.get_tasks_by_date(user_id, date, None)?;
 
-        // Sum up today's completed task bonuses
-        let today_tasks = TaskRepo::get_by_user(&*self.db, user_id, Some(TaskStatus::Completed))?;
-        let tasks_today: Vec<&Task> = today_tasks
-            .iter()
-            .filter(|t| t.completed_at.as_ref().map_or(false, |c| c.starts_with(date)))
-            .collect();
-
+        // Sum actual_minutes by category from completed tasks only
+        let mut work_minutes = 0;
+        let mut study_minutes = 0;
         let mut task_bonus_work = 0;
         let mut task_bonus_study = 0;
-        for t in &tasks_today {
-            let b = calc_task_bonus(t.category, t.estimated_minutes);
+
+        for t in &tasks {
+            if t.status != TaskStatus::Completed {
+                continue;
+            }
             match t.category {
-                TaskCategory::Work => task_bonus_work += b,
-                TaskCategory::Study => task_bonus_study += b,
+                TaskCategory::Work => {
+                    work_minutes += t.actual_minutes;
+                    task_bonus_work += calc_task_bonus(t.category, t.actual_minutes);
+                }
+                TaskCategory::Study => {
+                    study_minutes += t.actual_minutes;
+                    task_bonus_study += calc_task_bonus(t.category, t.actual_minutes);
+                }
                 TaskCategory::Other => {}
             }
         }
 
-        let base_survival = today_record.as_ref().map(|r| r.survival_faith).unwrap_or(0);
-        let base_progress = today_record.as_ref().map(|r| r.progress_faith).unwrap_or(0);
+        // Use domain calc functions for base faith
+        let survival_faith = calc_survival(work_minutes);
+        let progress_faith = calc_progress(study_minutes);
+        // US-003: discipline_faith = 0 when using task aggregation (no discipline input)
+        let discipline_faith = 0;
+        let total_faith = std::cmp::min(survival_faith + progress_faith, 100);
 
-        // Apply caps
-        let survival_faith = std::cmp::min(base_survival + task_bonus_work, 40);
-        let progress_faith = std::cmp::min(base_progress + task_bonus_study, 40);
-        let discipline_faith = today_record.as_ref().map(|r| r.discipline_faith).unwrap_or(0);
-        let total_faith = survival_faith + progress_faith + discipline_faith;
+        let completed_count = tasks.iter().filter(|t| t.status == TaskStatus::Completed).count();
 
         let user = UserRepo::get(&*self.db, user_id)?
             .ok_or_else(|| RepoError::UserNotFound(user_id.to_string()))?;
 
         Ok(DailyStats {
             date: date.to_string(),
-            work_minutes: today_record.as_ref().map(|r| r.work_minutes).unwrap_or(0),
-            study_minutes: today_record.as_ref().map(|r| r.study_minutes).unwrap_or(0),
+            work_minutes,
+            study_minutes,
             survival_faith,
             progress_faith,
             discipline_faith,
             total_faith,
             task_bonus_work,
             task_bonus_study,
-            tasks_completed: tasks_today.len() as i32,
+            tasks_completed: completed_count as i32,
             cumulative_faith: user.cumulative_faith,
         })
+    }
+
+    /// Get all tasks for a user on a specific date, optionally filtered by status (US-003).
+    pub fn get_tasks_by_date(&self, user_id: &str, date: &str, status: Option<TaskStatus>) -> Result<Vec<Task>, RepoError> {
+        let all_tasks = TaskRepo::get_by_user(&*self.db, user_id, status)?;
+        Ok(all_tasks.into_iter().filter(|t| t.date == date).collect())
+    }
+
+    /// Rebuild daily record by recalculating faith from all completed tasks of the day.
+    /// This ensures the daily record is always consistent with task states.
+    fn rebuild_daily_record(&self, user_id: &str, date: &str) -> Result<(), RepoError> {
+        let now = chrono::Utc::now();
+        let now_ts = now.to_rfc3339();
+
+        // 1. Get all completed tasks of the day
+        let tasks = self.get_tasks_by_date(user_id, date, Some(TaskStatus::Completed))?;
+
+        // 2. Aggregate work_minutes and study_minutes
+        let mut work_minutes = 0;
+        let mut study_minutes = 0;
+        for t in &tasks {
+            match t.category {
+                TaskCategory::Work => work_minutes += t.actual_minutes,
+                TaskCategory::Study => study_minutes += t.actual_minutes,
+                TaskCategory::Other => {}
+            }
+        }
+
+        // 3. Get discipline input (from existing DailyRecord, or default)
+        let existing: Option<DailyRecord> = DailyRecordRepo::get(&*self.db, user_id, date)?;
+        let discipline_input = existing
+            .as_ref()
+            .map(|r| DisciplineInput {
+                break_count: r.break_count,
+                leave_record: r.leave_record,
+                close_record: r.close_record,
+            })
+            .unwrap_or(DisciplineInput {
+                break_count: 0,
+                leave_record: 0,
+                close_record: 0,
+            });
+
+        // 4. Calculate full faith breakdown
+        let breakdown = crate::domain::calculate_daily(work_minutes, study_minutes, discipline_input);
+
+        // 5. Build and save DailyRecord
+        let record = crate::domain::build_daily_record(
+            user_id,
+            date,
+            work_minutes,
+            study_minutes,
+            discipline_input,
+            breakdown,
+            &now_ts,
+        );
+        DailyRecordRepo::upsert(&*self.db, &record)?;
+
+        Ok(())
     }
 
     /// Helper: apply task bonus to today's daily record.
@@ -218,7 +333,7 @@ impl TaskService {
         category: TaskCategory,
         bonus: i32,
     ) -> Result<(), RepoError> {
-        let now = chrono::Local::now();
+        let now = chrono::Utc::now();
         let now_ts = now.to_rfc3339();
 
         let existing: Option<DailyRecord> = DailyRecordRepo::get(&*self.db, user_id, date)?;
@@ -242,8 +357,8 @@ impl TaskService {
         };
 
         let discipline_input = DisciplineInput { break_count, leave_record, close_record };
-        let (_, da, db_, dc) = crate::domain::calc_discipline(discipline_input);
-        let total = new_survival + new_progress + base_discipline;
+        let (discipline_faith, da, db_, dc) = crate::domain::calc_discipline(discipline_input);
+        let total = new_survival + new_progress + discipline_faith;
 
         let record = DailyRecord {
             id: existing.as_ref().and_then(|r| r.id),
@@ -253,7 +368,7 @@ impl TaskService {
             study_minutes,
             survival_faith: new_survival,
             progress_faith: new_progress,
-            discipline_faith: base_discipline,
+            discipline_faith,
             total_faith: total,
             break_count,
             leave_record,
@@ -261,6 +376,7 @@ impl TaskService {
             discipline_a: da,
             discipline_b: db_,
             discipline_c: dc,
+            tasks_completed: existing.as_ref().map(|r| r.tasks_completed).unwrap_or(0),
             created_at: existing.as_ref().map(|r| r.created_at.clone()).unwrap_or_else(|| now_ts.clone()),
             updated_at: now_ts,
         };

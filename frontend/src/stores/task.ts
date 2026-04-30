@@ -3,7 +3,7 @@ import { ref, computed } from "vue";
 import type { Task, DailyStats, TaskStatus, TaskCategory } from "@/types";
 import { useFaithStore } from "./faith";
 import {
-  invoke_get_tasks,
+  invoke_get_tasks_by_date,
   invoke_create_task,
   invoke_complete_task,
   invoke_update_task,
@@ -12,12 +12,20 @@ import {
   invoke_get_daily_stats,
 } from "@/api/task";
 
+function todayString(): string {
+  return new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local, matches backend Local time
+}
+
 export const useTaskStore = defineStore("task", () => {
   const tasks = ref<Task[]>([]);
   const dailyStats = ref<DailyStats | null>(null);
   const filter = ref<TaskStatus | "all">("all");
   const isLoading = ref(false);
   const error = ref<string | null>(null);
+
+  // US-009: new state
+  const selectedDate = ref(todayString());
+  const calendarView = ref<"month" | "week" | "day">("month");
 
   const activeTasks = computed(() => tasks.value.filter(t => t.status === "active"));
   const completedTasks = computed(() => tasks.value.filter(t => t.status === "completed"));
@@ -28,11 +36,12 @@ export const useTaskStore = defineStore("task", () => {
     return tasks.value.filter(t => t.status === filter.value);
   });
 
-  async function fetchTasks(status?: TaskStatus) {
+  // US-009: renamed to fetchTasksByDate
+  async function fetchTasksByDate(date: string, status?: TaskStatus) {
     try {
       isLoading.value = true;
       error.value = null;
-      tasks.value = await invoke_get_tasks(status);
+      tasks.value = await invoke_get_tasks_by_date(date, status);
     } catch (e) {
       error.value = String(e);
     } finally {
@@ -40,16 +49,18 @@ export const useTaskStore = defineStore("task", () => {
     }
   }
 
+  // US-009: createTask accepts optional date param
   async function createTask(
     title: string,
     description: string,
     category: TaskCategory,
-    estimated_minutes: number
+    estimated_minutes: number,
+    date?: string
   ) {
     try {
       isLoading.value = true;
       error.value = null;
-      const task = await invoke_create_task(title, description, category, estimated_minutes);
+      const task = await invoke_create_task(title, description, category, estimated_minutes, date ?? selectedDate.value);
       tasks.value.push(task);
       return task;
     } catch (e) {
@@ -65,10 +76,8 @@ export const useTaskStore = defineStore("task", () => {
       isLoading.value = true;
       error.value = null;
       const result = await invoke_complete_task(id, actual_minutes);
-      // Update task in list
       const idx = tasks.value.findIndex(t => t.id === id);
       if (idx !== -1) tasks.value[idx] = result.task;
-      // Sync faith store (only today's record needed)
       const faithStore = useFaithStore();
       await faithStore.fetchTodayRecord();
       return result;
@@ -85,12 +94,14 @@ export const useTaskStore = defineStore("task", () => {
     title?: string,
     description?: string,
     estimated_minutes?: number,
-    notes?: string
+    actual_minutes?: number,
+    notes?: string,
+    status?: TaskStatus
   ) {
     try {
       isLoading.value = true;
       error.value = null;
-      const updated = await invoke_update_task(id, title, description, estimated_minutes, notes);
+      const updated = await invoke_update_task(id, title, description, estimated_minutes, actual_minutes, notes, status);
       const idx = tasks.value.findIndex(t => t.id === id);
       if (idx !== -1) tasks.value[idx] = updated;
       return updated;
@@ -144,6 +155,15 @@ export const useTaskStore = defineStore("task", () => {
     filter.value = f;
   }
 
+  // US-009: new actions
+  function setSelectedDate(date: string) {
+    selectedDate.value = date;
+  }
+
+  function setCalendarView(view: "month" | "week" | "day") {
+    calendarView.value = view;
+  }
+
   return {
     tasks,
     dailyStats,
@@ -154,7 +174,9 @@ export const useTaskStore = defineStore("task", () => {
     completedTasks,
     abandonedTasks,
     filteredTasks,
-    fetchTasks,
+    selectedDate,
+    calendarView,
+    fetchTasksByDate,
     createTask,
     completeTask,
     updateTask,
@@ -162,5 +184,7 @@ export const useTaskStore = defineStore("task", () => {
     deleteTask,
     fetchDailyStats,
     setFilter,
+    setSelectedDate,
+    setCalendarView,
   };
 });

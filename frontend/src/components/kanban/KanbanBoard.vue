@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useKanbanStore } from '@/stores/kanban';
+import { useTaskStore } from '@/stores/task';
 import type { Task } from '@/types';
 import KanbanColumn from './KanbanColumn.vue';
 
@@ -11,14 +12,11 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'card-start', task: Task): void;
-  (e: 'card-pause', task: Task): void;
-  (e: 'card-complete', task: Task): void;
-  (e: 'card-edit', task: Task): void;
-  (e: 'card-delete', task: Task): void;
+  (e: 'refresh'): void;
 }>();
 
 const store = useKanbanStore();
+const taskStore = useTaskStore();
 const showAddColumn = ref(false);
 const newColumnTitle = ref('');
 
@@ -43,24 +41,54 @@ function handleCardDrop(taskId: string, toColumnId: string, newOrder: number) {
   }
 }
 
-function handleCardStart(task: Task) {
-  emit('card-start', task);
+async function handleCardStart(task: Task) {
+  try {
+    await taskStore.updateTask(task.id, undefined, undefined, undefined, undefined, 'active');
+    store.startTimer(task.id);
+    emit('refresh');
+  } catch (error) {
+    console.error('Failed to start task:', error);
+  }
 }
 
-function handleCardPause(task: Task) {
-  emit('card-pause', task);
+async function handleCardPause(task: Task) {
+  try {
+    const elapsed = store.stopTimer(task.id);
+    const actualMinutes = task.actual_minutes + Math.ceil(elapsed / 60000);
+    
+    await taskStore.updateTask(task.id, undefined, undefined, actualMinutes, undefined, undefined);
+    emit('refresh');
+  } catch (error) {
+    console.error('Failed to pause task:', error);
+  }
 }
 
-function handleCardComplete(task: Task) {
-  emit('card-complete', task);
+async function handleCardComplete(task: Task) {
+  try {
+    const elapsed = store.stopTimer(task.id);
+    const actualMinutes = task.actual_minutes + Math.ceil(elapsed / 60000);
+    
+    await taskStore.completeTask(task.id, actualMinutes);
+    emit('refresh');
+  } catch (error) {
+    console.error('Failed to complete task:', error);
+  }
 }
 
 function handleCardEdit(task: Task) {
-  emit('card-edit', task);
+  // TODO: 打开编辑表单
+  console.log('Edit task:', task.id);
 }
 
-function handleCardDelete(task: Task) {
-  emit('card-delete', task);
+async function handleCardDelete(task: Task) {
+  if (confirm(`确定删除任务「${task.title}」？`)) {
+    try {
+      await taskStore.deleteTask(task.id);
+      emit('refresh');
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+    }
+  }
 }
 
 function handleAddColumn() {

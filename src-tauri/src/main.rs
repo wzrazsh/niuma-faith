@@ -11,40 +11,13 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use niuma_faith_lib::{AppState, SqliteDb};
 use niuma_faith_lib::domain::{
-    DailyRecord, DailyStats, DisciplineInput, FaithStatus, Task, TaskCategory,
+    DailyRecord, DailyStats, FaithStatus, Task, TaskCategory,
     TaskCompleteResult, TaskStatus, User,
 };
 
 // --- Existing Faith Commands ---
 
-/// 1. check_in — record today's work + study minutes + discipline
-#[tauri::command]
-async fn check_in(
-    state: tauri::State<'_, AppState>,
-    user_id: String,
-    work_minutes: i32,
-    study_minutes: i32,
-    break_count: i32,
-    leave_record: i32,
-    close_record: i32,
-) -> Result<FaithStatus, String> {
-    if break_count < 0 {
-        return Err("break_count must be >= 0".into());
-    }
-    if leave_record < 0 || leave_record > 2 {
-        return Err("leave_record must be 0, 1, or 2".into());
-    }
-    if close_record < 0 || close_record > 1 {
-        return Err("close_record must be 0 or 1".into());
-    }
-    let discipline = DisciplineInput { break_count, leave_record, close_record };
-    state
-        .faith_service
-        .check_in(&user_id, work_minutes, study_minutes, discipline)
-        .map_err(|e| e.to_string())
-}
-
-/// 2. get_status — retrieve current cumulative faith + level + today's record
+/// 1. get_status — retrieve current cumulative faith + level + today's record
 #[tauri::command]
 async fn get_status(state: tauri::State<'_, AppState>, user_id: String) -> Result<FaithStatus, String> {
     state
@@ -85,6 +58,7 @@ async fn create_task(
     description: String,
     category: String,
     estimated_minutes: i32,
+    date: Option<String>,
 ) -> Result<Task, String> {
     let cat = match category.as_str() {
         "work" => TaskCategory::Work,
@@ -97,11 +71,31 @@ async fn create_task(
     }
     state
         .task_service
-        .create_task(&user_id, title, description, cat, estimated_minutes)
+        .create_task(&user_id, title, description, cat, estimated_minutes, date)
         .map_err(|e| e.to_string())
 }
 
-/// 6. get_tasks — get all tasks for a user, optionally filtered
+/// 6. get_tasks_by_date — get tasks for a user on a specific date
+#[tauri::command]
+async fn get_tasks_by_date(
+    state: tauri::State<'_, AppState>,
+    user_id: String,
+    date: String,
+    status: Option<String>,
+) -> Result<Vec<Task>, String> {
+    let status_filter = status.map(|s| match s.as_str() {
+        "active" => Some(TaskStatus::Active),
+        "completed" => Some(TaskStatus::Completed),
+        "abandoned" => Some(TaskStatus::Abandoned),
+        _ => None,
+    }).flatten();
+    state
+        .task_service
+        .get_tasks_by_date(&user_id, &date, status_filter)
+        .map_err(|e| e.to_string())
+}
+
+/// 7. get_tasks — get all tasks for a user, optionally filtered
 #[tauri::command]
 async fn get_tasks(
     state: tauri::State<'_, AppState>,
@@ -120,7 +114,7 @@ async fn get_tasks(
         .map_err(|e| e.to_string())
 }
 
-/// 7. get_task — get a single task by ID
+/// 8. get_task — get a single task by ID
 #[tauri::command]
 async fn get_task(state: tauri::State<'_, AppState>, id: String) -> Result<Option<Task>, String> {
     state
@@ -129,7 +123,7 @@ async fn get_task(state: tauri::State<'_, AppState>, id: String) -> Result<Optio
         .map_err(|e| e.to_string())
 }
 
-/// 8. update_task — update task fields (not status)
+/// 9. update_task — update task fields (not status)
 #[tauri::command]
 async fn update_task(
     state: tauri::State<'_, AppState>,
@@ -146,11 +140,11 @@ async fn update_task(
     }
     state
         .task_service
-        .update_task(&id, title, description, estimated_minutes, notes)
+        .update_task(&id, title, description, estimated_minutes, None, notes, None)
         .map_err(|e| e.to_string())
 }
 
-/// 9. complete_task — mark task as completed, grant bonus faith
+/// 10. complete_task — mark task as completed, grant bonus faith
 #[tauri::command]
 async fn complete_task(
     state: tauri::State<'_, AppState>,
@@ -166,7 +160,7 @@ async fn complete_task(
         .map_err(|e| e.to_string())
 }
 
-/// 10. abandon_task — mark task as abandoned (no bonus)
+/// 11. abandon_task — mark task as abandoned (no bonus)
 #[tauri::command]
 async fn abandon_task(state: tauri::State<'_, AppState>, id: String) -> Result<Task, String> {
     state
@@ -175,7 +169,7 @@ async fn abandon_task(state: tauri::State<'_, AppState>, id: String) -> Result<T
         .map_err(|e| e.to_string())
 }
 
-/// 11. delete_task — permanently delete a task
+/// 12. delete_task — permanently delete a task
 #[tauri::command]
 async fn delete_task(state: tauri::State<'_, AppState>, id: String) -> Result<bool, String> {
     state
@@ -184,7 +178,7 @@ async fn delete_task(state: tauri::State<'_, AppState>, id: String) -> Result<bo
         .map_err(|e| e.to_string())
 }
 
-/// 12. get_daily_stats — get daily stats with task bonus breakdown
+/// 13. get_daily_stats — get daily stats with task bonus breakdown
 #[tauri::command]
 async fn get_daily_stats(
     state: tauri::State<'_, AppState>,
@@ -199,7 +193,7 @@ async fn get_daily_stats(
 
 // --- Widget Commands ---
 
-/// 13. open_floating_widget — open the floating widget window
+/// 14. open_floating_widget — open the floating widget window
 #[tauri::command]
 async fn open_floating_widget(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("floating") {
@@ -220,7 +214,7 @@ async fn open_floating_widget(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// 14. close_floating_widget — hide the floating widget window
+/// 15. close_floating_widget — hide the floating widget window
 #[tauri::command]
 async fn close_floating_widget(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("floating") {
@@ -321,12 +315,12 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            check_in,
             get_status,
             get_today_record,
             get_or_create_user,
             create_task,
             get_tasks,
+            get_tasks_by_date,
             get_task,
             update_task,
             complete_task,

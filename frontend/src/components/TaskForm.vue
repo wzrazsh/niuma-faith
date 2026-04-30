@@ -4,7 +4,7 @@ import { useTaskStore } from "@/stores/task";
 import type { Task, TaskCategory } from "@/types";
 
 const props = defineProps<{
-  task: Task | null;
+  task?: Task | null;
 }>();
 
 const emit = defineEmits<{
@@ -45,7 +45,7 @@ async function handleSubmit() {
   try {
     const minutes = Math.round(estimatedHours.value * 60);
     if (isEdit.value && props.task) {
-      await store.updateTask(props.task.id, title.value.trim(), description.value.trim(), minutes, notes.value.trim() || undefined);
+      await store.updateTask(props.task.id, title.value.trim(), description.value.trim(), minutes, undefined, notes.value.trim() || undefined);
     } else {
       await store.createTask(title.value.trim(), description.value.trim(), category.value, minutes);
     }

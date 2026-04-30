@@ -7,7 +7,8 @@ export async function invoke_create_task(
   title: string,
   description: string,
   category: string,
-  estimated_minutes: number
+  estimated_minutes: number,
+  date?: string
 ): Promise<Task> {
   return invoke<Task>("create_task", {
     userId: DEFAULT_USER_ID,
@@ -15,12 +16,24 @@ export async function invoke_create_task(
     description,
     category,
     estimatedMinutes: estimated_minutes,
+    date: date ?? null,
   });
 }
 
 export async function invoke_get_tasks(status?: TaskStatus): Promise<Task[]> {
   return invoke<Task[]>("get_tasks", {
     userId: DEFAULT_USER_ID,
+    status: status ?? null,
+  });
+}
+
+export async function invoke_get_tasks_by_date(
+  date: string,
+  status?: TaskStatus
+): Promise<Task[]> {
+  return invoke<Task[]>("get_tasks_by_date", {
+    userId: DEFAULT_USER_ID,
+    date,
     status: status ?? null,
   });
 }
@@ -34,14 +47,18 @@ export async function invoke_update_task(
   title?: string,
   description?: string,
   estimated_minutes?: number,
-  notes?: string
+  actual_minutes?: number,
+  notes?: string,
+  status?: string
 ): Promise<Task> {
   return invoke<Task>("update_task", {
     id,
     title: title ?? null,
     description: description ?? null,
     estimatedMinutes: estimated_minutes ?? null,
+    actualMinutes: actual_minutes ?? null,
     notes: notes ?? null,
+    status: status ?? null,
   });
 }
 
