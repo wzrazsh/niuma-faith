@@ -1,10 +1,11 @@
 <!-- frontend/src/components/kanban/KanbanBoard.vue -->
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useKanbanStore } from '@/stores/kanban';
 import { useTaskStore } from '@/stores/task';
 import type { Task } from '@/types';
 import KanbanColumn from './KanbanColumn.vue';
+import { reminderService } from '@/services/reminder-service';
 
 const props = defineProps<{
   tasks: Task[];
@@ -22,7 +23,34 @@ const newColumnTitle = ref('');
 
 onMounted(async () => {
   await store.loadBoardConfig();
+  // 启动提醒服务
+  reminderService.start();
+  // 注册已有任务的提醒
+  registerTaskReminders();
 });
+
+onUnmounted(() => {
+  reminderService.stop();
+});
+
+// 监听任务变化，重新注册提醒
+watch(() => props.tasks, () => {
+  registerTaskReminders();
+});
+
+function registerTaskReminders() {
+  // 清除旧提醒
+  reminderService.stop();
+  reminderService.start();
+  
+  // 注册有提醒设置的任务
+  for (const task of props.tasks) {
+    const card = store.cards.get(task.id);
+    if (card?.reminder?.enabled && card.reminder.time) {
+      reminderService.addReminder(task.id, card.reminder.time, task.title);
+    }
+  }
+}
 
 function getTasksForColumn(columnId: string): Task[] {
   const column = store.columns.find(c => c.id === columnId);
