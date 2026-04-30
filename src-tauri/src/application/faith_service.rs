@@ -6,17 +6,33 @@ use std::sync::Arc;
 use crate::data::{DailyRecordRepo, RepoError, SqliteDb, UserRepo};
 use crate::domain::{
     get_level, progress_to_next, DailyRecord,
-    FaithStatus, User,
+    DisciplineInput, FaithStatus, User,
 };
+use crate::application::FaithLedgerService;
 
 /// Check-in service — orchestrates domain logic and persistence.
 pub struct FaithService {
     db: Arc<SqliteDb>,
+    ledger: Arc<FaithLedgerService>,
 }
 
 impl FaithService {
     pub fn new(db: Arc<SqliteDb>) -> Self {
-        Self { db }
+        let ledger = Arc::new(FaithLedgerService::new(db.clone()));
+        Self { db, ledger }
+    }
+
+    pub fn check_in(
+        &self,
+        user_id: &str,
+        work_minutes: i32,
+        study_minutes: i32,
+        discipline: DisciplineInput,
+    ) -> Result<FaithStatus, RepoError> {
+        let now = chrono::Local::now();
+        let date = now.format("%Y-%m-%d").to_string();
+        let record = self.ledger.upsert_daily_record(user_id, &date, work_minutes, study_minutes, discipline)?;
+        self.build_status(user_id, Some(record))
     }
 
     /// Retrieve current faith status for a user (no check-in).

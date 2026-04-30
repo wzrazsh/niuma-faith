@@ -6,6 +6,10 @@ import {
   invoke_get_tasks_by_date,
   invoke_create_task,
   invoke_complete_task,
+  invoke_start_task,
+  invoke_pause_task,
+  invoke_resume_task,
+  invoke_end_task,
   invoke_update_task,
   invoke_abandon_task,
   invoke_delete_task,
@@ -23,11 +27,12 @@ export const useTaskStore = defineStore("task", () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
-  // US-009: new state
   const selectedDate = ref(todayString());
   const calendarView = ref<"month" | "week" | "day">("month");
 
-  const activeTasks = computed(() => tasks.value.filter(t => t.status === "active"));
+  const runningTasks = computed(() => tasks.value.filter(t => t.status === "running"));
+  const pausedTasks = computed(() => tasks.value.filter(t => t.status === "paused"));
+  const activeTasks = computed(() => tasks.value.filter(t => t.status === "running" || t.status === "paused"));
   const completedTasks = computed(() => tasks.value.filter(t => t.status === "completed"));
   const abandonedTasks = computed(() => tasks.value.filter(t => t.status === "abandoned"));
 
@@ -81,6 +86,74 @@ export const useTaskStore = defineStore("task", () => {
       const faithStore = useFaithStore();
       await faithStore.fetchTodayRecord();
       return result;
+    } catch (e) {
+      error.value = String(e);
+      throw e;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function startTask(id: string) {
+    try {
+      isLoading.value = true;
+      error.value = null;
+      const updated = await invoke_start_task(id);
+      const idx = tasks.value.findIndex(t => t.id === id);
+      if (idx !== -1) tasks.value[idx] = updated;
+      return updated;
+    } catch (e) {
+      error.value = String(e);
+      throw e;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function pauseTask(id: string) {
+    try {
+      isLoading.value = true;
+      error.value = null;
+      const updated = await invoke_pause_task(id);
+      const idx = tasks.value.findIndex(t => t.id === id);
+      if (idx !== -1) tasks.value[idx] = updated;
+      const faithStore = useFaithStore();
+      await faithStore.fetchTodayRecord();
+      return updated;
+    } catch (e) {
+      error.value = String(e);
+      throw e;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function resumeTask(id: string) {
+    try {
+      isLoading.value = true;
+      error.value = null;
+      const updated = await invoke_resume_task(id);
+      const idx = tasks.value.findIndex(t => t.id === id);
+      if (idx !== -1) tasks.value[idx] = updated;
+      return updated;
+    } catch (e) {
+      error.value = String(e);
+      throw e;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function endTask(id: string) {
+    try {
+      isLoading.value = true;
+      error.value = null;
+      const updated = await invoke_end_task(id);
+      const idx = tasks.value.findIndex(t => t.id === id);
+      if (idx !== -1) tasks.value[idx] = updated;
+      const faithStore = useFaithStore();
+      await faithStore.fetchTodayRecord();
+      return updated;
     } catch (e) {
       error.value = String(e);
       throw e;
@@ -170,7 +243,8 @@ export const useTaskStore = defineStore("task", () => {
     filter,
     isLoading,
     error,
-    activeTasks,
+    runningTasks,
+    pausedTasks,
     completedTasks,
     abandonedTasks,
     filteredTasks,
@@ -179,6 +253,10 @@ export const useTaskStore = defineStore("task", () => {
     fetchTasksByDate,
     createTask,
     completeTask,
+    startTask,
+    pauseTask,
+    resumeTask,
+    endTask,
     updateTask,
     abandonTask,
     deleteTask,

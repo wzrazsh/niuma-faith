@@ -31,9 +31,20 @@ function closeForm() {
   editingTask.value = null;
 }
 
-async function handleComplete(task: Task) {
-  const actual = task.actual_minutes > 0 ? task.actual_minutes : task.estimated_minutes;
-  await store.completeTask(task.id, actual);
+async function handleStart(task: Task) {
+  await store.startTask(task.id);
+}
+
+async function handlePause(task: Task) {
+  await store.pauseTask(task.id);
+}
+
+async function handleResume(task: Task) {
+  await store.resumeTask(task.id);
+}
+
+async function handleEnd(task: Task) {
+  await store.endTask(task.id);
 }
 
 async function handleAbandon(task: Task) {
@@ -65,13 +76,13 @@ function categoryLabel(cat: string): string {
     <div class="list-header">
       <div class="tabs">
         <button
-          v-for="f in (['all', 'active', 'completed', 'abandoned'] as const)"
+          v-for="f in (['all', 'running', 'paused', 'completed', 'abandoned'] as const)"
           :key="f"
           class="tab-btn"
           :class="{ active: store.filter === f }"
           @click="store.setFilter(f)"
         >
-          {{ f === 'all' ? '全部' : f === 'active' ? '进行中' : f === 'completed' ? '已完成' : '已放弃' }}
+          {{ f === 'all' ? '全部' : f === 'running' ? '专注中' : f === 'paused' ? '待继续' : f === 'completed' ? '已完成' : '已放弃' }}
         </button>
       </div>
       <button v-if="!readonly" class="add-btn" @click="openCreateForm">+ 添加任务</button>
@@ -80,7 +91,7 @@ function categoryLabel(cat: string): string {
 
     <div v-if="store.isLoading" class="loading">加载中...</div>
     <div v-else-if="store.filteredTasks.length === 0" class="empty">
-      <p>暂无{{ store.filter === 'all' ? '' : store.filter === 'active' ? '进行中' : store.filter === 'completed' ? '已完成' : '已放弃' }}任务</p>
+      <p>暂无{{ store.filter === 'all' ? '' : store.filter === 'running' ? '专注中' : store.filter === 'paused' ? '待继续' : store.filter === 'completed' ? '已完成' : '已放弃' }}任务</p>
     </div>
     <ul v-else class="task-items">
       <li v-for="task in store.filteredTasks" :key="task.id" class="task-item">
@@ -95,13 +106,23 @@ function categoryLabel(cat: string): string {
           </div>
           <p v-if="task.description" class="task-desc">{{ task.description }}</p>
         </div>
+<<<<<<< HEAD
         <div v-if="!readonly" class="task-actions">
-          <template v-if="task.status === 'active'">
-            <button class="action-btn complete" @click="handleComplete(task)">完成</button>
+          <template v-if="task.status === 'running'">
+            <button class="action-btn edit" @click="handlePause(task)">暂停</button>
+            <button class="action-btn complete" @click="handleEnd(task)">结束</button>
+          </template>
+          <template v-else-if="task.status === 'paused'">
+            <button class="action-btn complete" @click="task.started_at ? handleResume(task) : handleStart(task)">
+              {{ task.started_at ? '继续' : '开始' }}
+            </button>
             <button class="action-btn edit" @click="openEditForm(task)">编辑</button>
             <button class="action-btn abandon" @click="handleAbandon(task)">放弃</button>
+            <button class="action-btn delete" @click="handleDelete(task)">删除</button>
           </template>
-          <button class="action-btn delete" @click="handleDelete(task)">删除</button>
+          <template v-else-if="task.status === 'completed' || task.status === 'abandoned'">
+            <button class="action-btn delete" @click="handleDelete(task)">删除</button>
+          </template>
         </div>
       </li>
     </ul>

@@ -72,6 +72,22 @@ export async function invoke_complete_task(
   });
 }
 
+export async function invoke_start_task(id: string): Promise<Task> {
+  return invoke<Task>("start_task", { id });
+}
+
+export async function invoke_pause_task(id: string): Promise<Task> {
+  return invoke<Task>("pause_task", { id });
+}
+
+export async function invoke_resume_task(id: string): Promise<Task> {
+  return invoke<Task>("resume_task", { id });
+}
+
+export async function invoke_end_task(id: string): Promise<Task> {
+  return invoke<Task>("end_task", { id });
+}
+
 export async function invoke_abandon_task(id: string): Promise<Task> {
   return safeInvoke<Task>("abandon_task", { id });
 }

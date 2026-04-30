@@ -103,7 +103,9 @@ async fn get_tasks(
     status: Option<String>,
 ) -> Result<Vec<Task>, String> {
     let status_filter = status.map(|s| match s.as_str() {
-        "active" => Some(TaskStatus::Active),
+        "active" => Some(TaskStatus::Paused),
+        "running" => Some(TaskStatus::Running),
+        "paused" => Some(TaskStatus::Paused),
         "completed" => Some(TaskStatus::Completed),
         "abandoned" => Some(TaskStatus::Abandoned),
         _ => None,
@@ -178,7 +180,43 @@ async fn delete_task(state: tauri::State<'_, AppState>, id: String) -> Result<bo
         .map_err(|e| e.to_string())
 }
 
-/// 13. get_daily_stats — get daily stats with task bonus breakdown
+/// 12. start_task — start timing a task (running)
+#[tauri::command]
+async fn start_task(state: tauri::State<'_, AppState>, id: String) -> Result<Task, String> {
+    state
+        .task_service
+        .start_task(&id)
+        .map_err(|e| e.to_string())
+}
+
+/// 13. pause_task — pause timing a task (closes current session)
+#[tauri::command]
+async fn pause_task(state: tauri::State<'_, AppState>, id: String) -> Result<Task, String> {
+    state
+        .task_service
+        .pause_task(&id)
+        .map_err(|e| e.to_string())
+}
+
+/// 14. resume_task — resume timing a paused task (opens new session)
+#[tauri::command]
+async fn resume_task(state: tauri::State<'_, AppState>, id: String) -> Result<Task, String> {
+    state
+        .task_service
+        .resume_task(&id)
+        .map_err(|e| e.to_string())
+}
+
+/// 15. end_task — end a task (completed)
+#[tauri::command]
+async fn end_task(state: tauri::State<'_, AppState>, id: String) -> Result<Task, String> {
+    state
+        .task_service
+        .end_task(&id)
+        .map_err(|e| e.to_string())
+}
+
+/// 16. get_daily_stats — get daily stats with task bonus breakdown
 #[tauri::command]
 async fn get_daily_stats(
     state: tauri::State<'_, AppState>,
@@ -326,6 +364,10 @@ fn main() {
             complete_task,
             abandon_task,
             delete_task,
+            start_task,
+            pause_task,
+            resume_task,
+            end_task,
             get_daily_stats,
             open_floating_widget,
             close_floating_widget,

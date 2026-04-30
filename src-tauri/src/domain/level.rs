@@ -4,9 +4,15 @@
 use super::models::Level;
 
 /// All 15 levels indexed by level number (1..=15).
+<<<<<<< HEAD
 /// Lv1 threshold = 0, Lv15 threshold = 1095000 (2.0 version x10)
 const LEVELS: &[Level] = &[
     Level { level: 1,  threshold: 0,         title: "见习牛马" },
+=======
+/// Lv1 threshold = 0, Lv15 threshold = 1095000.
+const LEVELS: &[Level] = &[
+    Level { level: 1,  threshold: 0,       title: "见习牛马" },
+>>>>>>> 9b39a5137433633932a685cf023060c9e810effc
     Level { level: 2,  threshold: 15_000,    title: "工位信徒" },
     Level { level: 3,  threshold: 40_000,    title: "初级供奉者" },
     Level { level: 4,  threshold: 80_000,    title: "稳定产出者" },
@@ -14,6 +20,7 @@ const LEVELS: &[Level] = &[
     Level { level: 6,  threshold: 205_000,   title: "双修学徒" },
     Level { level: 7,  threshold: 290_000,   title: "工时祭司" },
     Level { level: 8,  threshold: 395_000,   title: "苦修执行官" },
+<<<<<<< HEAD
     Level { level: 9,  threshold: 520_000,    title: "连轴修行者" },
     Level { level: 10, threshold: 665_000,    title: "钢铁牛马" },
     Level { level: 11, threshold: 825_000,    title: "卷力使徒" },
@@ -21,6 +28,15 @@ const LEVELS: &[Level] = &[
     Level { level: 13, threshold: 1_025_000,   title: "福报传道者" },
     Level { level: 14, threshold: 1_070_000,   title: "31日苦修士" },
     Level { level: 15, threshold: 1_095_000,   title: "牛马圣徒" },
+=======
+    Level { level: 9,  threshold: 520_000,   title: "连轴修行者" },
+    Level { level: 10, threshold: 665_000,   title: "钢铁牛马" },
+    Level { level: 11, threshold: 825_000,   title: "卷力使徒" },
+    Level { level: 12, threshold: 945_000,   title: "精进主教" },
+    Level { level: 13, threshold: 1_025_000, title: "福报传道者" },
+    Level { level: 14, threshold: 1_070_000, title: "31日苦修士" },
+    Level { level: 15, threshold: 1_095_000, title: "牛马圣徒" },
+>>>>>>> 9b39a5137433633932a685cf023060c9e810effc
 ];
 
 /// Return the Level entry for a given cumulative faith value.
@@ -126,7 +142,11 @@ mod tests {
     #[test]
     fn progress_near_lv15() {
         // Lv15 threshold = 1095000, max level → None
+<<<<<<< HEAD
         assert_eq!(progress_to_next(1_090_000), Some(5_000));
+=======
+        assert_eq!(progress_to_next(1_094_500), Some(500));
+>>>>>>> 9b39a5137433633932a685cf023060c9e810effc
         assert_eq!(progress_to_next(1_095_000), None);
     }
 

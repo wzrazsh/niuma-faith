@@ -57,7 +57,7 @@ export interface FaithStatus {
 // --- Task types ---
 
 export type TaskCategory = 'work' | 'study' | 'other';
-export type TaskStatus = 'active' | 'completed' | 'abandoned';
+export type TaskStatus = 'running' | 'paused' | 'completed' | 'abandoned';
 
 export interface Task {
   id: string;
@@ -70,7 +70,10 @@ export interface Task {
   status: TaskStatus;
   notes: string;
   created_at: string;
+  started_at: string | null;
   completed_at: string | null;
+  duration_seconds: number;
+  ai_summary: string | null;
   updated_at: string;
 }
 

@@ -73,9 +73,7 @@ pub struct User {
     pub nickname: String,
     pub cumulative_faith: i64,
     pub current_level: i32,
-    // Armor system (2.0)
-    pub armor: i64,        // Max armor based on level tier
-    pub total_armor: i64,  // Current remaining armor
+    pub armor_points: i32,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -112,4 +110,16 @@ pub fn calc_armor(current_level: i32) -> i64 {
         11..=15 => 6_000,
         _ => 0,
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FaithTransaction {
+    pub id: Option<i64>,
+    pub user_id: String,
+    pub ts: String,
+    pub delta: i32,
+    pub armor_delta: i32,
+    pub kind: String,
+    pub ref_id: Option<String>,
+    pub message: String,
 }
