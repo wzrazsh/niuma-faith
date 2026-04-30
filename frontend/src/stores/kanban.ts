@@ -35,6 +35,22 @@ export const useKanbanStore = defineStore('kanban', () => {
     await saveBoardConfig();
   }
 
+  function moveToColumn(taskId: string, toColumnId: string) {
+    // 先从所有列中移除
+    for (const col of columns.value) {
+      const idx = col.taskIds.indexOf(taskId);
+      if (idx !== -1) {
+        col.taskIds.splice(idx, 1);
+      }
+    }
+    // 添加到目标列
+    const targetCol = columns.value.find(c => c.id === toColumnId);
+    if (targetCol) {
+      targetCol.taskIds.push(taskId);
+    }
+    saveBoardConfig();
+  }
+
   function startTimer(taskId: string) {
     if (activeTimers.value.has(taskId)) return;
     
@@ -86,6 +102,14 @@ export const useKanbanStore = defineStore('kanban', () => {
     saveBoardConfig();
   }
 
+  function addCardToColumn(taskId: string, columnId: string) {
+    const col = columns.value.find(c => c.id === columnId);
+    if (col) {
+      col.taskIds.push(taskId);
+      saveBoardConfig();
+    }
+  }
+
   function removeColumn(columnId: string) {
     const col = columns.value.find(c => c.id === columnId);
     if (!col || !col.isCustom) return;
@@ -103,10 +127,12 @@ export const useKanbanStore = defineStore('kanban', () => {
     loadBoardConfig,
     saveBoardConfig,
     moveCard,
+    moveToColumn,
     startTimer,
     stopTimer,
     getElapsedTime,
     addColumn,
+    addCardToColumn,
     removeColumn,
   };
 });

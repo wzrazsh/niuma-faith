@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { safeInvoke } from "./mock-invoke";
 import type { Task, TaskCompleteResult, DailyStats, TaskStatus } from "@/types";
 
 const DEFAULT_USER_ID = "default_user";
@@ -10,7 +10,7 @@ export async function invoke_create_task(
   estimated_minutes: number,
   date?: string
 ): Promise<Task> {
-  return invoke<Task>("create_task", {
+  return safeInvoke<Task>("create_task", {
     userId: DEFAULT_USER_ID,
     title,
     description,
@@ -21,7 +21,7 @@ export async function invoke_create_task(
 }
 
 export async function invoke_get_tasks(status?: TaskStatus): Promise<Task[]> {
-  return invoke<Task[]>("get_tasks", {
+  return safeInvoke<Task[]>("get_tasks", {
     userId: DEFAULT_USER_ID,
     status: status ?? null,
   });
@@ -31,7 +31,7 @@ export async function invoke_get_tasks_by_date(
   date: string,
   status?: TaskStatus
 ): Promise<Task[]> {
-  return invoke<Task[]>("get_tasks_by_date", {
+  return safeInvoke<Task[]>("get_tasks_by_date", {
     userId: DEFAULT_USER_ID,
     date,
     status: status ?? null,
@@ -39,7 +39,7 @@ export async function invoke_get_tasks_by_date(
 }
 
 export async function invoke_get_task(id: string): Promise<Task | null> {
-  return invoke<Task | null>("get_task", { id });
+  return safeInvoke<Task | null>("get_task", { id });
 }
 
 export async function invoke_update_task(
@@ -51,7 +51,7 @@ export async function invoke_update_task(
   notes?: string,
   status?: string
 ): Promise<Task> {
-  return invoke<Task>("update_task", {
+  return safeInvoke<Task>("update_task", {
     id,
     title: title ?? null,
     description: description ?? null,
@@ -66,22 +66,22 @@ export async function invoke_complete_task(
   id: string,
   actual_minutes: number
 ): Promise<TaskCompleteResult> {
-  return invoke<TaskCompleteResult>("complete_task", {
+  return safeInvoke<TaskCompleteResult>("complete_task", {
     id,
     actualMinutes: actual_minutes,
   });
 }
 
 export async function invoke_abandon_task(id: string): Promise<Task> {
-  return invoke<Task>("abandon_task", { id });
+  return safeInvoke<Task>("abandon_task", { id });
 }
 
 export async function invoke_delete_task(id: string): Promise<boolean> {
-  return invoke<boolean>("delete_task", { id });
+  return safeInvoke<boolean>("delete_task", { id });
 }
 
 export async function invoke_get_daily_stats(date: string): Promise<DailyStats> {
-  return invoke<DailyStats>("get_daily_stats", {
+  return safeInvoke<DailyStats>("get_daily_stats", {
     userId: DEFAULT_USER_ID,
     date,
   });

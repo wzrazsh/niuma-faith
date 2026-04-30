@@ -4,6 +4,7 @@ import { ref, onMounted } from 'vue';
 import type { Task, TaskCategory } from '@/types';
 import { useTaskStore } from '@/stores/task';
 import { useKanbanStore } from '@/stores/kanban';
+import { kanbanApi } from '@/services/kanban-api';
 
 const props = defineProps<{
   task?: Task; // 如果提供，则为编辑模式
@@ -12,7 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  (e: 'saved'): void;
+  (e: 'saved', columnId: string): void;
 }>();
 
 const taskStore = useTaskStore();
@@ -23,7 +24,15 @@ const title = ref(props.task?.title ?? '');
 const description = ref(props.task?.description ?? '');
 const category = ref<TaskCategory>(props.task?.category ?? 'work');
 const estimatedHours = ref(props.task ? props.task.estimated_minutes / 60 : 1);
-const selectedColumn = ref(props.columnId ?? 'todo');
+
+// 从看板列查找当前任务所在列
+function findTaskColumn(taskId: string): string {
+  for (const col of kanbanStore.columns) {
+    if (col.taskIds.includes(taskId)) return col.id;
+  }
+  return props.columnId ?? 'todo';
+}
+const selectedColumn = ref(findTaskColumn(props.task?.id ?? ''));
 
 // 进程绑定
 const enableProcessBinding = ref(false);
@@ -41,6 +50,27 @@ const isSubmitting = ref(false);
 onMounted(async () => {
   if (kanbanStore.columns.length === 0) {
     await kanbanStore.loadBoardConfig();
+  }
+  // 编辑模式：加载已有的看板卡片配置
+  if (props.task) {
+    const key = `kanban-card-${props.task.id}`;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      try {
+        const card = JSON.parse(stored);
+        if (card.processBinding) {
+          enableProcessBinding.value = true;
+          appName.value = card.processBinding.appName ?? '';
+          autoStart.value = card.processBinding.autoStart ?? true;
+          autoPause.value = card.processBinding.autoPause ?? true;
+        }
+        if (card.reminder) {
+          enableReminder.value = card.reminder.enabled ?? false;
+          reminderTime.value = card.reminder.time ?? '09:00';
+        }
+      } catch { /* ignore parse errors */ }
+    }
+    selectedColumn.value = findTaskColumn(props.task.id);
   }
 });
 
@@ -81,10 +111,31 @@ async function handleSubmit() {
       );
     }
     
-    // TODO: 保存看板相关设置（进程绑定、提醒）
-    // 这部分需要 kanban store 支持
-    
-    emit('saved');
+    // 保存进程绑定
+    const taskId = props.task?.id ? props.task.id : taskStore.tasks[taskStore.tasks.length - 1]?.id;
+    if (taskId) {
+      if (enableProcessBinding.value && appName.value.trim()) {
+        await kanbanApi.bindProcess(taskId, {
+          appName: appName.value.trim(),
+          autoStart: autoStart.value,
+          autoPause: autoPause.value,
+        });
+      } else {
+        await kanbanApi.unbindProcess(taskId);
+      }
+      // 保存提醒设置
+      const cardKey = `kanban-card-${taskId}`;
+      const stored = localStorage.getItem(cardKey);
+      let card = stored ? JSON.parse(stored) : { task: { id: taskId }, columnId: selectedColumn.value, orderInColumn: 0 };
+      if (enableReminder.value) {
+        card.reminder = { time: reminderTime.value, enabled: true };
+      } else if (card.reminder) {
+        card.reminder.enabled = false;
+      }
+      localStorage.setItem(cardKey, JSON.stringify(card));
+    }
+
+    emit('saved', selectedColumn.value);
   } catch (e: any) {
     errorMsg.value = String(e);
   } finally {

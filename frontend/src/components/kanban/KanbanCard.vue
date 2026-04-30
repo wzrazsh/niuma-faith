@@ -85,6 +85,7 @@ onUnmounted(() => {
     :class="{ active: isActive }"
     draggable="true"
     @dragstart="handleDragStart"
+    @dblclick="emit('edit', task)"
   >
     <div class="card-header">
       <span class="card-title">{{ task.title }}</span>

@@ -5,6 +5,7 @@ import { useKanbanStore } from '@/stores/kanban';
 import { useTaskStore } from '@/stores/task';
 import type { Task } from '@/types';
 import KanbanColumn from './KanbanColumn.vue';
+import KanbanCardForm from './KanbanCardForm.vue';
 import { reminderService } from '@/services/reminder-service';
 
 const props = defineProps<{
@@ -74,7 +75,8 @@ function handleCardDrop(taskId: string, toColumnId: string, newOrder: number) {
 
 async function handleCardStart(task: Task) {
   try {
-    await taskStore.updateTask(task.id, undefined, undefined, undefined, undefined, 'active');
+    await taskStore.updateTask(task.id, undefined, undefined, undefined, undefined, undefined, 'active');
+    store.moveToColumn(task.id, 'doing');
     store.startTimer(task.id);
     emit('refresh');
   } catch (error) {
@@ -87,7 +89,8 @@ async function handleCardPause(task: Task) {
     const elapsed = store.stopTimer(task.id);
     const actualMinutes = task.actual_minutes + Math.ceil(elapsed / 60000);
     
-    await taskStore.updateTask(task.id, undefined, undefined, actualMinutes, undefined, undefined);
+    await taskStore.updateTask(task.id, undefined, undefined, undefined, actualMinutes, undefined, 'paused');
+    store.moveToColumn(task.id, 'paused');
     emit('refresh');
   } catch (error) {
     console.error('Failed to pause task:', error);
@@ -100,6 +103,7 @@ async function handleCardComplete(task: Task) {
     const actualMinutes = task.actual_minutes + Math.ceil(elapsed / 60000);
     
     await taskStore.completeTask(task.id, actualMinutes);
+    store.moveToColumn(task.id, 'done');
     emit('refresh');
   } catch (error) {
     console.error('Failed to complete task:', error);
@@ -122,9 +126,17 @@ function handleFormClose() {
   editingTask.value = null;
 }
 
-function handleFormSaved() {
+function handleFormSaved(columnId?: string) {
+  const wasEditing = !!editingTask.value;
   showForm.value = false;
   editingTask.value = null;
+  // 将新建的任务添加到对应列
+  if (!wasEditing && columnId) {
+    const newTask = taskStore.tasks[taskStore.tasks.length - 1];
+    if (newTask) {
+      store.addCardToColumn(newTask.id, columnId);
+    }
+  }
   emit('refresh');
 }
 

@@ -315,21 +315,20 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::get_status,
-            commands::get_today_record,
-            commands::get_or_create_user,
-            commands::create_task,
-            commands::get_tasks,
-            commands::get_tasks_by_date,
-            commands::get_task,
-            commands::update_task,
-            commands::complete_task,
-            commands::abandon_task,
-            commands::delete_task,
-            commands::get_daily_stats,
-            commands::open_floating_widget,
-            commands::close_floating_widget,
-            // commands::is_process_running,
+            get_status,
+            get_today_record,
+            get_or_create_user,
+            create_task,
+            get_tasks,
+            get_tasks_by_date,
+            get_task,
+            update_task,
+            complete_task,
+            abandon_task,
+            delete_task,
+            get_daily_stats,
+            open_floating_widget,
+            close_floating_widget,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
