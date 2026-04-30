@@ -20,6 +20,9 @@ const store = useKanbanStore();
 const taskStore = useTaskStore();
 const showAddColumn = ref(false);
 const newColumnTitle = ref('');
+const showForm = ref(false);
+const editingTask = ref<Task | null>(null);
+const selectedColumnId = ref<string | undefined>(undefined);
 
 onMounted(async () => {
   await store.loadBoardConfig();
@@ -104,8 +107,25 @@ async function handleCardComplete(task: Task) {
 }
 
 function handleCardEdit(task: Task) {
-  // TODO: 打开编辑表单
-  console.log('Edit task:', task.id);
+  editingTask.value = task;
+  showForm.value = true;
+}
+
+function openCreateForm(columnId?: string) {
+  editingTask.value = null;
+  selectedColumnId.value = columnId;
+  showForm.value = true;
+}
+
+function handleFormClose() {
+  showForm.value = false;
+  editingTask.value = null;
+}
+
+function handleFormSaved() {
+  showForm.value = false;
+  editingTask.value = null;
+  emit('refresh');
 }
 
 async function handleCardDelete(task: Task) {
@@ -140,13 +160,22 @@ function handleDeleteColumn(columnId: string) {
     
     <template v-else>
       <div class="board-header">
-        <button 
-          v-if="!readonly" 
-          class="add-column-btn" 
-          @click="showAddColumn = !showAddColumn"
-        >
-          + 添加列
-        </button>
+        <div class="header-left">
+          <button 
+            v-if="!readonly" 
+            class="add-task-btn" 
+            @click="openCreateForm()"
+          >
+            + 创建任务
+          </button>
+          <button 
+            v-if="!readonly" 
+            class="add-column-btn" 
+            @click="showAddColumn = !showAddColumn"
+          >
+            + 添加列
+          </button>
+        </div>
       </div>
 
       <div v-if="showAddColumn && !readonly" class="add-column-form">
@@ -174,9 +203,18 @@ function handleDeleteColumn(columnId: string) {
           @card-edit="handleCardEdit"
           @card-delete="handleCardDelete"
           @delete-column="handleDeleteColumn"
+          @add-task="openCreateForm(column.id)"
         />
       </div>
     </template>
+    
+    <KanbanCardForm
+      v-if="showForm && !readonly"
+      :task="editingTask"
+      :column-id="selectedColumnId"
+      @close="handleFormClose"
+      @saved="handleFormSaved"
+    />
   </div>
 </template>
 

@@ -19,6 +19,7 @@ const emit = defineEmits<{
   (e: 'card-edit', task: Task): void;
   (e: 'card-delete', task: Task): void;
   (e: 'delete-column', columnId: string): void;
+  (e: 'add-task', columnId: string): void;
 }>();
 
 const isDragOver = ref(false);
@@ -49,48 +50,58 @@ function handleDrop(e: DragEvent) {
 }
 </script>
 
-<template>
-  <div
-    class="kanban-column"
-    :class="{ 'drag-over': isDragOver }"
-    @dragover="handleDragOver"
-    @dragleave="handleDragLeave"
-    @drop="handleDrop"
-  >
-    <div class="column-header">
-      <div class="column-title-row">
-        <h3 class="column-title">{{ column.title }}</h3>
-        <span class="column-count">{{ tasks.length }}</span>
-      </div>
-      <button
-        v-if="column.isCustom && !readonly"
-        class="delete-column-btn"
-        @click="emit('delete-column', column.id)"
-        title="删除列"
+    <template>
+      <div
+        class="kanban-column"
+        :class="{ 'drag-over': isDragOver }"
+        @dragover="handleDragOver"
+        @dragleave="handleDragLeave"
+        @drop="handleDrop"
       >
-        ×
-      </button>
-    </div>
-    
-    <div class="column-cards">
-      <KanbanCard
-        v-for="task in tasks"
-        :key="task.id"
-        :task="task"
-        :readonly="readonly"
-        @start="(t) => emit('card-start', t)"
-        @pause="(t) => emit('card-pause', t)"
-        @complete="(t) => emit('card-complete', t)"
-        @edit="(t) => emit('card-edit', t)"
-        @delete="(t) => emit('card-delete', t)"
-      />
-      
-      <div v-if="tasks.length === 0" class="column-empty">
-        暂无任务
+        <div class="column-header">
+          <div class="column-title-row">
+            <h3 class="column-title">{{ column.title }}</h3>
+            <span class="column-count">{{ tasks.length }}</span>
+          </div>
+          <div class="column-actions">
+            <button
+              v-if="!readonly"
+              class="add-task-btn"
+              @click="emit('add-task', column.id)"
+              title="创建任务"
+            >
+              +
+            </button>
+            <button
+              v-if="column.isCustom && !readonly"
+              class="delete-column-btn"
+              @click="emit('delete-column', column.id)"
+              title="删除列"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+        
+        <div class="column-cards">
+          <KanbanCard
+            v-for="task in tasks"
+            :key="task.id"
+            :task="task"
+            :readonly="readonly"
+            @start="(t) => emit('card-start', t)"
+            @pause="(t) => emit('card-pause', t)"
+            @complete="(t) => emit('card-complete', t)"
+            @edit="(t) => emit('card-edit', t)"
+            @delete="(t) => emit('card-delete', t)"
+          />
+          
+          <div v-if="tasks.length === 0" class="column-empty">
+            暂无任务
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-</template>
+    </template>
 
 <style scoped>
 .kanban-column {
