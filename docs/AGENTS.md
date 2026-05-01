@@ -10,22 +10,19 @@ Design specifications, requirements documents, and task documentation for the �
 | File | Description |
 |------|-------------|
 | `vision.md` | Product vision and design principles |
-| `tasks.md` | Task tracking and implementation notes |
 | `test-plan.md` | Testing plan and verification checklist |
-| `fix-order.md` | Bug fixes and issue tracking |
-| `牛马信仰-需求文档.md` | Chinese requirements document |
+| `牛马信仰-需求文档.md` | Chinese requirements document (authoritative) |
 
 ## Subdirectories
 | Directory | Purpose |
 |-----------|---------|
-| `superpowers/` | Advanced feature designs |
-| `superpowers/specs/` | Detailed specifications |
+| `archive/` | Closed-out specs and one-off task lists kept for history |
 
 ## For AI Agents
 
 ### Working In This Directory
 - Documents contain design context and requirements
-- Specs in `superpowers/specs/` detail implementation for advanced features
+- Closed-out implementation worklogs and completed designs live in `archive/` (read-only history)
 - Chinese documents (`牛马信仰-需求文档.md`) are authoritative requirements
 
 ### Testing Requirements
