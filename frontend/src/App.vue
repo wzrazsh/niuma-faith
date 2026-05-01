@@ -1,17 +1,23 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { onMounted } from "vue";
+import { useRoute } from "vue-router";
 import { useFaithStore } from "@/stores/faith";
 
+const route = useRoute();
 const store = useFaithStore();
+const isFloating = computed(() => route.path === '/floating');
 
 onMounted(async () => {
-  await store.init();
+  if (!isFloating.value) {
+    await store.init();
+  }
 });
 </script>
 
 <template>
   <div id="app">
-    <nav class="main-nav">
+    <nav v-if="!isFloating" class="main-nav">
       <router-link to="/" class="nav-link">仪表盘</router-link>
       <router-link to="/kanban" class="nav-link">任务看板</router-link>
     </nav>

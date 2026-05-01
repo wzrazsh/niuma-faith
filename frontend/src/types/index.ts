@@ -96,3 +96,9 @@ export interface DailyStats {
   tasks_completed: number;
   cumulative_faith: number;
 }
+
+export interface ProcessInfo {
+  pid: number;
+  name: string;
+  status: string;
+}

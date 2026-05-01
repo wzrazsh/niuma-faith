@@ -88,4 +88,119 @@ mod tests {
         let user = UserRepo::get(&*db, "u1").unwrap().unwrap();
         assert_eq!(user.cumulative_faith, 200);
     }
+
+    // --- 16a. upsert_daily_record: repeated upsert is idempotent ---
+
+    #[test]
+    fn upsert_daily_record_idempotent() {
+        let db = Arc::new(SqliteDb::in_memory().unwrap());
+        let now = "2026-04-18T00:00:00+08:00";
+        UserRepo::upsert(&*db, &User {
+            id: "u2".into(),
+            nickname: "".into(),
+            cumulative_faith: 0,
+            current_level: 1,
+            armor_points: 0,
+            created_at: now.into(),
+            updated_at: now.into(),
+        }).unwrap();
+
+        let ledger = FaithLedgerService::new(db.clone());
+        let disc = DisciplineInput { break_count: 0, leave_record: 0, close_record: 1 };
+
+        let rec1 = ledger.upsert_daily_record("u2", "2026-04-18", 480, 240, disc).unwrap();
+        let faith1 = UserRepo::get(&*db, "u2").unwrap().unwrap().cumulative_faith;
+
+        // Same exact values again
+        let rec2 = ledger.upsert_daily_record("u2", "2026-04-18", 480, 240, disc).unwrap();
+        let faith2 = UserRepo::get(&*db, "u2").unwrap().unwrap().cumulative_faith;
+
+        assert_eq!(rec1.total_faith, rec2.total_faith);
+        assert_eq!(faith1, faith2, "Cumulative faith should not change on idempotent upsert");
+    }
+
+    // --- 16b. upsert_daily_record: reducing to 0 (min discipline = 200) ---
+
+    #[test]
+    fn upsert_daily_record_reduce_to_min() {
+        let db = Arc::new(SqliteDb::in_memory().unwrap());
+        let now = "2026-04-18T00:00:00+08:00";
+        UserRepo::upsert(&*db, &User {
+            id: "u3".into(),
+            nickname: "".into(),
+            cumulative_faith: 0,
+            current_level: 1,
+            armor_points: 0,
+            created_at: now.into(),
+            updated_at: now.into(),
+        }).unwrap();
+
+        let ledger = FaithLedgerService::new(db.clone());
+        let full_disc = DisciplineInput { break_count: 0, leave_record: 0, close_record: 1 };
+
+        // First give full score
+        ledger.upsert_daily_record("u3", "2026-04-18", 480, 0, full_disc).unwrap();
+        let user_full = UserRepo::get(&*db, "u3").unwrap().unwrap();
+        assert_eq!(user_full.cumulative_faith, 600);
+
+        // Reduce to zero work/study minutes, keep full discipline (minimum = 200 discipline)
+        ledger.upsert_daily_record("u3", "2026-04-18", 0, 0, full_disc).unwrap();
+        let user_reduced = UserRepo::get(&*db, "u3").unwrap().unwrap();
+        assert_eq!(user_reduced.cumulative_faith, 200, "Should go from 600 to 200 (minimum discipline)");
+    }
+
+    // --- 16c. negative values protection ---
+
+    #[test]
+    fn upsert_daily_record_negative_work_minutes_clamped() {
+        let db = Arc::new(SqliteDb::in_memory().unwrap());
+        let now = "2026-04-18T00:00:00+08:00";
+        UserRepo::upsert(&*db, &User {
+            id: "u4".into(),
+            nickname: "".into(),
+            cumulative_faith: 0,
+            current_level: 1,
+            armor_points: 0,
+            created_at: now.into(),
+            updated_at: now.into(),
+        }).unwrap();
+
+        let ledger = FaithLedgerService::new(db.clone());
+        let disc = DisciplineInput { break_count: 0, leave_record: 0, close_record: 1 };
+
+        let record = ledger.upsert_daily_record("u4", "2026-04-18", -100, -200, disc).unwrap();
+        // Negative minutes produce 0 survival/progress faith via calc_survival
+        assert_eq!(record.survival_faith, 0);
+        assert_eq!(record.progress_faith, 0);
+        // discipline is still 200
+        assert_eq!(record.total_faith, 200);
+    }
+
+    // --- cross-day: upsert on different days accumulates ---
+
+    #[test]
+    fn upsert_daily_record_cross_day_accumulates() {
+        let db = Arc::new(SqliteDb::in_memory().unwrap());
+        let now = "2026-04-18T00:00:00+08:00";
+        UserRepo::upsert(&*db, &User {
+            id: "u5".into(),
+            nickname: "".into(),
+            cumulative_faith: 0,
+            current_level: 1,
+            armor_points: 0,
+            created_at: now.into(),
+            updated_at: now.into(),
+        }).unwrap();
+
+        let ledger = FaithLedgerService::new(db.clone());
+        let disc = DisciplineInput { break_count: 0, leave_record: 0, close_record: 1 };
+
+        ledger.upsert_daily_record("u5", "2026-04-18", 480, 0, disc).unwrap();
+        let user_day1 = UserRepo::get(&*db, "u5").unwrap().unwrap();
+        assert_eq!(user_day1.cumulative_faith, 600);
+
+        ledger.upsert_daily_record("u5", "2026-04-19", 480, 240, disc).unwrap();
+        let user_day2 = UserRepo::get(&*db, "u5").unwrap().unwrap();
+        assert_eq!(user_day2.cumulative_faith, 1400, "600 + 800 = 1400 cross-day total");
+    }
 }

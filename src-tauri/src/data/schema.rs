@@ -92,7 +92,7 @@ pub fn init_schema(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     Ok(())
 }
 
-fn ensure_column(
+pub fn ensure_column(
     conn: &rusqlite::Connection,
     table: &str,
     column: &str,

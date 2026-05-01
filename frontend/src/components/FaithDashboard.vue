@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { onMounted, computed } from "vue";
 import { useFaithStore } from "@/stores/faith";
+import { formatNumber } from "@/utils/format";
 
 const faithStore = useFaithStore();
+const DAILY_MAX = 1000;
 
 onMounted(async () => {
   await faithStore.fetchStatus();
@@ -10,33 +12,51 @@ onMounted(async () => {
 
 const faithStatus = computed(() => faithStore.faithStatus);
 const todayRecord = computed(() => faithStatus.value?.today ?? null);
+
+const todayTotalFaith = computed(() => todayRecord.value?.total_faith ?? 0);
+
+const dailyMaxPercent = computed(() => {
+  return Math.min(100, (todayTotalFaith.value / DAILY_MAX) * 100);
+});
 </script>
 
 <template>
   <section class="faith-dashboard">
-    <h3 class="panel-title">今日信仰汇总</h3>
+    <div class="panel-header">
+      <h3 class="panel-title">今日信仰汇总</h3>
+      <span class="daily-max-indicator">
+        今日信仰: <strong>{{ formatNumber(todayTotalFaith) }}</strong> / {{ formatNumber(DAILY_MAX) }}
+      </span>
+    </div>
+
+    <div class="daily-max-track">
+      <div
+        class="daily-max-fill"
+        :style="{ width: dailyMaxPercent + '%' }"
+      ></div>
+    </div>
 
     <div v-if="todayRecord" class="faith-breakdown">
       <div class="breakdown-row">
         <span class="row-label">生存信仰</span>
-        <span class="row-value survival">{{ todayRecord.survival_faith }}</span>
+        <span class="row-value survival">{{ formatNumber(todayRecord.survival_faith) }}</span>
       </div>
 
       <div class="breakdown-row">
         <span class="row-label">精进信仰</span>
-        <span class="row-value progress">{{ todayRecord.progress_faith }}</span>
+        <span class="row-value progress">{{ formatNumber(todayRecord.progress_faith) }}</span>
       </div>
 
       <div class="breakdown-row">
         <span class="row-label">戒律信仰</span>
-        <span class="row-value discipline">{{ todayRecord.discipline_faith }}</span>
+        <span class="row-value discipline">{{ formatNumber(todayRecord.discipline_faith) }}</span>
       </div>
 
       <div class="row-divider"></div>
 
       <div class="breakdown-row total-row">
         <span class="row-label">今日总计</span>
-        <span class="row-value total">{{ todayRecord.total_faith }}</span>
+        <span class="row-value total">{{ formatNumber(todayRecord.total_faith) }}</span>
       </div>
 
       <div class="task-summary">
@@ -57,11 +77,43 @@ const todayRecord = computed(() => faithStatus.value?.today ?? null);
   padding: 20px;
 }
 
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
 .panel-title {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--color-text);
-  margin-bottom: 16px;
+  margin: 0;
+}
+
+.daily-max-indicator {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.daily-max-indicator strong {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.daily-max-track {
+  height: 4px;
+  background: var(--color-bg);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+
+.daily-max-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary-dark), var(--color-primary));
+  border-radius: 2px;
+  transition: width 0.6s ease;
 }
 
 .faith-breakdown {

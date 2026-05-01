@@ -3,10 +3,13 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useKanbanStore } from '@/stores/kanban';
 import { useTaskStore } from '@/stores/task';
-import type { Task } from '@/types';
+import type { Task, TaskStatus } from '@/types';
+import type { ProcessBinding, KanbanCard as KanbanCardType } from '@/types/kanban';
 import KanbanColumn from './KanbanColumn.vue';
 import KanbanCardForm from './KanbanCardForm.vue';
 import { reminderService } from '@/services/reminder-service';
+import { processDetector } from '@/services/process-detector';
+import { kanbanApi } from '@/services/kanban-api';
 
 const props = defineProps<{
   tasks: Task[];
@@ -22,38 +25,125 @@ const taskStore = useTaskStore();
 const showAddColumn = ref(false);
 const newColumnTitle = ref('');
 const showForm = ref(false);
-const editingTask = ref<Task | null>(null);
+const editingTask = ref<Task | undefined>(undefined);
 const selectedColumnId = ref<string | undefined>(undefined);
+
+const cardConfigs = ref<Map<string, KanbanCardType>>(new Map());
+const processRunning = ref<Map<string, boolean>>(new Map());
+const pollingCleanups = ref<Map<string, () => void>>(new Map());
 
 onMounted(async () => {
   await store.loadBoardConfig();
-  // 启动提醒服务
+  await loadCardConfigs();
   reminderService.start();
-  // 注册已有任务的提醒
   registerTaskReminders();
 });
 
 onUnmounted(() => {
   reminderService.stop();
+  stopAllPolling();
 });
 
 // 监听任务变化，重新注册提醒
 watch(() => props.tasks, () => {
+  loadCardConfigs();
   registerTaskReminders();
 });
 
 function registerTaskReminders() {
-  // 清除旧提醒
   reminderService.stop();
   reminderService.start();
   
-  // 注册有提醒设置的任务
   for (const task of props.tasks) {
-    const card = store.cards.get(task.id);
+    const card = cardConfigs.value.get(task.id);
     if (card?.reminder?.enabled && card.reminder.time) {
       reminderService.addReminder(task.id, card.reminder.time, task.title);
     }
   }
+}
+
+function loadCardConfigs() {
+  const newMap = new Map<string, KanbanCardType>();
+  for (const task of props.tasks) {
+    try {
+      const key = `kanban-card-${task.id}`;
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        const card: KanbanCardType = JSON.parse(stored);
+        newMap.set(task.id, card);
+        if (card.processBinding) {
+          processRunning.value.set(task.id, false);
+          startProcessPolling(task.id, card.processBinding);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load card config for", task.id, e);
+    }
+  }
+  cardConfigs.value = newMap;
+}
+
+function startProcessPolling(taskId: string, binding: ProcessBinding) {
+  const cleanup = processDetector.startPolling(
+    binding.appName,
+    3000,
+    (running) => {
+      processRunning.value.set(taskId, running);
+      const task = props.tasks.find((t) => t.id === taskId);
+      if (!task) return;
+
+      if (running && binding.autoStart && task.status !== ("active" as TaskStatus)) {
+        handleCardStart(task);
+      } else if (!running && binding.autoPause && task.status === ("active" as TaskStatus)) {
+        handleCardPause(task);
+      }
+    }
+  );
+  pollingCleanups.value.set(taskId, cleanup);
+}
+
+function stopProcessPolling(taskId: string) {
+  const cleanup = pollingCleanups.value.get(taskId);
+  if (cleanup) {
+    cleanup();
+    pollingCleanups.value.delete(taskId);
+  }
+  processRunning.value.delete(taskId);
+}
+
+function stopAllPolling() {
+  for (const cleanup of pollingCleanups.value.values()) {
+    cleanup();
+  }
+  pollingCleanups.value.clear();
+  processRunning.value.clear();
+}
+
+function handleBindProcess(task: Task, binding: ProcessBinding) {
+  kanbanApi.bindProcess(task.id, binding);
+  const card = cardConfigs.value.get(task.id) || {
+    task,
+    columnId: "",
+    orderInColumn: 0,
+  };
+  card.processBinding = binding;
+  cardConfigs.value.set(task.id, card);
+  processRunning.value.set(task.id, false);
+  startProcessPolling(task.id, binding);
+}
+
+function handleUnbindProcess(task: Task) {
+  kanbanApi.unbindProcess(task.id);
+  stopProcessPolling(task.id);
+  const card = cardConfigs.value.get(task.id);
+  if (card) {
+    delete card.processBinding;
+    cardConfigs.value.set(task.id, card);
+  }
+}
+
+function getProcessBinding(taskId: string): ProcessBinding | undefined {
+  return cardConfigs.value.get(taskId)?.processBinding;
 }
 
 function getTasksForColumn(columnId: string): Task[] {
@@ -62,6 +152,16 @@ function getTasksForColumn(columnId: string): Task[] {
   return column.taskIds
     .map(taskId => props.tasks.find(t => t.id === taskId))
     .filter((t): t is Task => t !== undefined);
+}
+
+function getColumnProcessBindings(columnId: string): Map<string, ProcessBinding | undefined> {
+  const result = new Map<string, ProcessBinding | undefined>();
+  const column = store.columns.find(c => c.id === columnId);
+  if (!column) return result;
+  for (const taskId of column.taskIds) {
+    result.set(taskId, getProcessBinding(taskId));
+  }
+  return result;
 }
 
 function handleCardDrop(taskId: string, toColumnId: string, newOrder: number) {
@@ -75,7 +175,7 @@ function handleCardDrop(taskId: string, toColumnId: string, newOrder: number) {
 
 async function handleCardStart(task: Task) {
   try {
-    await taskStore.updateTask(task.id, undefined, undefined, undefined, undefined, undefined, 'active');
+    await taskStore.updateTask(task.id, undefined, undefined, undefined, undefined, undefined, 'active' as TaskStatus);
     store.moveToColumn(task.id, 'doing');
     store.startTimer(task.id);
     emit('refresh');
@@ -116,20 +216,20 @@ function handleCardEdit(task: Task) {
 }
 
 function openCreateForm(columnId?: string) {
-  editingTask.value = null;
+  editingTask.value = undefined;
   selectedColumnId.value = columnId;
   showForm.value = true;
 }
 
 function handleFormClose() {
   showForm.value = false;
-  editingTask.value = null;
+  editingTask.value = undefined;
 }
 
 function handleFormSaved(columnId?: string) {
   const wasEditing = !!editingTask.value;
   showForm.value = false;
-  editingTask.value = null;
+  editingTask.value = undefined;
   // 将新建的任务添加到对应列
   if (!wasEditing && columnId) {
     const newTask = taskStore.tasks[taskStore.tasks.length - 1];
@@ -208,6 +308,8 @@ function handleDeleteColumn(columnId: string) {
           :column="column"
           :tasks="getTasksForColumn(column.id)"
           :readonly="readonly"
+          :process-bindings="getColumnProcessBindings(column.id)"
+          :process-running="processRunning"
           @card-drop="handleCardDrop"
           @card-start="handleCardStart"
           @card-pause="handleCardPause"
@@ -216,6 +318,8 @@ function handleDeleteColumn(columnId: string) {
           @card-delete="handleCardDelete"
           @delete-column="handleDeleteColumn"
           @add-task="openCreateForm(column.id)"
+          @bind-process="handleBindProcess"
+          @unbind-process="handleUnbindProcess"
         />
       </div>
     </template>

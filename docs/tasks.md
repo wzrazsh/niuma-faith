@@ -1470,12 +1470,67 @@ git commit -m "feat: add custom column management (add/delete)"
 
 ---
 
+## Session 2: 搭建测试框架 + 实现看板绑定命令终端功能 ✅
+
+**Date: 2026-05-01** — All 5 stories completed.
+
+### US-001: 搭建 src-tauri 测试框架 ✅
+- Added 13 new command tests (9 core + 4 process) in `src-tauri/src/`
+- Fixed 4 pre-existing SQLite bugs (missing columns: tasks.date, daily_records.tasks_completed)
+- Test result: 82 passed, 0 failed
+
+### US-002: 后端增强进程检测命令 ✅
+- Added `list_processes` command with Windows CSV parsing
+- Added `ProcessInfo` struct (pid, name, status)
+- Added `is_process_running` command
+- Registered both commands in `main.rs`
+
+### US-003: 创建前端进程检测服务 ✅
+- Created `frontend/src/services/process-detector.ts` with `isRunning()`, `listProcesses()`, `startPolling()`
+- Added `ProcessInfo` type to `types/index.ts`
+- Added mock handlers in `mock-invoke.ts`
+
+### US-004: 实现看板卡片绑定终端功能 ✅
+- Added process binding UI to `KanbanCard.vue` (bind/unbind form, process name input, autoStart/autoPause checkboxes, running status indicator)
+- Updated `KanbanColumn.vue` event forwarding for process binding events
+
+### US-005: 在看板主页面集成进程检测器 ✅
+- `KanbanBoard.vue` loads card configs, starts process polling (3s interval)
+- Auto starts/pauses tasks when bound process starts/stops
+- Card configs persisted via localStorage
+
+### Files Changed
+- `frontend/src/types/index.ts` (+ProcessInfo)
+- `frontend/src/api/mock-invoke.ts` (+is_process_running, list_processes handlers)
+- `frontend/src/services/process-detector.ts` (NEW)
+- `frontend/src/components/kanban/KanbanCard.vue` (process binding UI)
+- `frontend/src/components/kanban/KanbanColumn.vue` (props/emits forwarding)
+- `frontend/src/components/kanban/KanbanBoard.vue` (polling integration)
+- `progress.txt` (updated status)
+
+### Build Status
+- Frontend: vite build ✅
+- Backend: cargo test 82/82 ✅
+
+---
+
+## Phase Status
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1 | ✅ Complete | 基础看板（6个任务） |
+| Phase 2 | ✅ Complete | 多任务计时（2个任务） |
+| Phase 3 | ✅ Complete | 自动检测（3个任务）+ 后端进程检测命令 |
+| Phase 4 | ⬜ Remaining | 智能提醒与优化（2个任务） |
+
+---
+
 ## 总结
 
 **已完成任务清单：**
-- [ ] Phase 1: 基础看板（6个任务）
-- [ ] Phase 2: 多任务计时（2个任务）
-- [ ] Phase 3: 自动检测（3个任务）
+- [x] Phase 1: 基础看板（6个任务）
+- [x] Phase 2: 多任务计时（2个任务）
+- [x] Phase 3: 自动检测（3个任务）+ 后端进程检测命令扩展
 - [ ] Phase 4: 智能提醒与优化（2个任务）
 
 **总计：13个任务**

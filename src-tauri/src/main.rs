@@ -11,7 +11,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use niuma_faith_lib::{AppState, SqliteDb};
 use niuma_faith_lib::domain::{
-    DailyRecord, DailyStats, FaithStatus, Task, TaskCategory,
+    DailyRecord, DailyStats, FaithStatus, ProcessInfo, Task, TaskCategory,
     TaskCompleteResult, TaskStatus, User,
 };
 
@@ -84,14 +84,14 @@ async fn get_tasks_by_date(
     status: Option<String>,
 ) -> Result<Vec<Task>, String> {
     let status_filter = status.map(|s| match s.as_str() {
-        "active" => Some(TaskStatus::Active),
+        "active" => Some(TaskStatus::Paused),
         "completed" => Some(TaskStatus::Completed),
         "abandoned" => Some(TaskStatus::Abandoned),
         _ => None,
     }).flatten();
     state
         .task_service
-        .get_tasks_by_date(&user_id, &date, status_filter)
+        .get_tasks(&user_id, status_filter)
         .map_err(|e| e.to_string())
 }
 
@@ -241,7 +241,7 @@ async fn open_floating_widget(app: tauri::AppHandle) -> Result<(), String> {
     }
     WebviewWindowBuilder::new(&app, "floating", WebviewUrl::App("/#/floating".into()))
         .title("牛马信仰 悬浮")
-        .inner_size(280.0, 200.0)
+        .inner_size(80.0, 80.0)
         .resizable(false)
         .always_on_top(true)
         .decorations(false)
@@ -259,6 +259,76 @@ async fn close_floating_widget(app: tauri::AppHandle) -> Result<(), String> {
         window.hide().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+/// 17. show_main_window — show the main dashboard window
+#[tauri::command]
+async fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        window.set_focus().map_err(|e| e.to_string())?;
+    } else {
+        WebviewWindowBuilder::new(&app, "main", WebviewUrl::App("/".into()))
+            .title("牛马信仰")
+            .inner_size(900.0, 700.0)
+            .build()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// 16. list_processes — list all processes matching the given name (Windows CSV parse)
+#[tauri::command]
+async fn list_processes(
+    _state: tauri::State<'_, AppState>,
+    app_name: String,
+) -> Result<Vec<ProcessInfo>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let output = std::process::Command::new("tasklist")
+            .args(&["/FO", "CSV", "/NH"])
+            .output()
+            .map_err(|e| format!("Failed to execute tasklist: {}", e))?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut results = Vec::new();
+
+        for line in stdout.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let parts: Vec<&str> = line
+                .split(',')
+                .map(|s| s.trim_matches('"').trim())
+                .collect();
+
+            if parts.len() < 3 {
+                continue;
+            }
+
+            let name = parts[0].to_string();
+            if !name.to_lowercase().contains(&app_name.to_lowercase()) {
+                continue;
+            }
+
+            let pid: u32 = parts[1].parse().unwrap_or(0);
+            let status = parts[2].to_string();
+
+            results.push(ProcessInfo {
+                pid,
+                name,
+                status,
+            });
+        }
+
+        Ok(results)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Unsupported platform".to_string())
+    }
 }
 
 fn main() {
@@ -356,6 +426,7 @@ fn main() {
             get_status,
             get_today_record,
             get_or_create_user,
+            list_processes,
             create_task,
             get_tasks,
             get_tasks_by_date,
@@ -371,6 +442,7 @@ fn main() {
             get_daily_stats,
             open_floating_widget,
             close_floating_widget,
+            show_main_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

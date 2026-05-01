@@ -3,6 +3,7 @@ import { ref, computed, watch } from "vue";
 import CalendarView from "./CalendarView.vue";
 import TaskList from "./TaskList.vue";
 import FaithDashboard from "./FaithDashboard.vue";
+import StatusPanel from "./StatusPanel.vue";
 import { useTaskStore } from "@/stores/task";
 import { useFaithStore } from "@/stores/faith";
 
@@ -72,6 +73,7 @@ watch(selectedDate, loadData, { immediate: true });
 
       <!-- Faith Card (Daily Stats) -->
       <div class="faith-section">
+        <StatusPanel v-if="faithStore.faithStatus" />
         <FaithDashboard v-if="faithStore.faithStatus" :status="faithStore.faithStatus" />
       </div>
 
@@ -174,8 +176,16 @@ watch(selectedDate, loadData, { immediate: true });
   font-weight: 600;
 }
 
-.task-section,
 .faith-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.task-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 16px;

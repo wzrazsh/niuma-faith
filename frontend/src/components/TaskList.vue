@@ -106,7 +106,6 @@ function categoryLabel(cat: string): string {
           </div>
           <p v-if="task.description" class="task-desc">{{ task.description }}</p>
         </div>
-<<<<<<< HEAD
         <div v-if="!readonly" class="task-actions">
           <template v-if="task.status === 'running'">
             <button class="action-btn edit" @click="handlePause(task)">暂停</button>

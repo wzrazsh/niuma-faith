@@ -65,8 +65,7 @@ impl FaithService {
             nickname: String::new(),
             cumulative_faith: 0,
             current_level: 1,
-            armor: 0,
-            total_armor: 0,
+            armor_points: 0,
             created_at: now.clone(),
             updated_at: now,
         };
@@ -94,8 +93,148 @@ impl FaithService {
             progress_to_next: progress.unwrap_or(0),
             next_threshold: progress.map(|p| user.cumulative_faith + p),
             today,
-            armor: user.armor,
-            total_armor: user.total_armor,
+            armor: user.armor_points as i64,
+            total_armor: user.armor_points as i64,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data::{SqliteDb, UserRepo};
+    use crate::domain::User;
+    use std::sync::Arc;
+
+    fn setup() -> (Arc<SqliteDb>, FaithService) {
+        let db = Arc::new(SqliteDb::in_memory().unwrap());
+        let svc = FaithService::new(db.clone());
+        (db, svc)
+    }
+
+    fn create_user(db: &SqliteDb, id: &str, cumulative_faith: i64, level: i32, armor: i32) {
+        let now = chrono::Local::now().to_rfc3339();
+        UserRepo::upsert(&*db, &User {
+            id: id.into(),
+            nickname: "".into(),
+            cumulative_faith,
+            current_level: level,
+            armor_points: armor,
+            created_at: now.clone(),
+            updated_at: now,
+        }).unwrap();
+    }
+
+    #[test]
+    fn check_in_with_no_user_errors() {
+        let (_db, svc) = setup();
+        let disc = DisciplineInput { break_count: 0, leave_record: 0, close_record: 1 };
+        let result = svc.check_in("no_such_user", 480, 0, disc);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn check_in_new_user_creates_record() {
+        let (db, svc) = setup();
+        create_user(&db, "u1", 0, 1, 0);
+
+        let disc = DisciplineInput { break_count: 0, leave_record: 0, close_record: 1 };
+        let status = svc.check_in("u1", 480, 0, disc).unwrap();
+        assert!(status.today.is_some());
+        let today = status.today.as_ref().unwrap();
+        assert_eq!(today.work_minutes, 480);
+        assert_eq!(today.survival_faith, 400);
+        assert_eq!(today.discipline_faith, 200);
+        assert_eq!(today.total_faith, 600);
+    }
+
+    #[test]
+    fn check_in_twice_same_day_overwrites() {
+        let (db, svc) = setup();
+        create_user(&db, "u1", 0, 1, 0);
+
+        let disc = DisciplineInput { break_count: 0, leave_record: 0, close_record: 1 };
+        svc.check_in("u1", 480, 0, disc).unwrap();
+        let status = svc.check_in("u1", 0, 240, disc).unwrap();
+        let today = status.today.as_ref().unwrap();
+        assert_eq!(today.work_minutes, 0);
+        assert_eq!(today.study_minutes, 240);
+        assert_eq!(today.survival_faith, 0);
+        assert_eq!(today.progress_faith, 200);
+    }
+
+    #[test]
+    fn get_status_after_check_in() {
+        let (db, svc) = setup();
+        create_user(&db, "u1", 0, 1, 0);
+
+        let disc = DisciplineInput { break_count: 0, leave_record: 0, close_record: 1 };
+        svc.check_in("u1", 480, 240, disc).unwrap();
+        let status = svc.get_status("u1").unwrap();
+        assert_eq!(status.current_level, 1);
+        assert_eq!(status.level_title, "见习牛马");
+    }
+
+    #[test]
+    fn build_status_includes_armor_fields() {
+        let (db, svc) = setup();
+        create_user(&db, "u1", 15000, 2, 2000);
+
+        let status = svc.get_status("u1").unwrap();
+        assert_eq!(status.armor, 2000, "armor should match user's armor_points");
+        assert_eq!(status.total_armor, 2000, "total_armor should match armor_points");
+        assert_eq!(status.current_level, 2);
+        assert_eq!(status.level_title, "工位信徒");
+    }
+
+    #[test]
+    fn build_status_zero_armor() {
+        let (db, svc) = setup();
+        create_user(&db, "u1", 0, 1, 0);
+
+        let status = svc.get_status("u1").unwrap();
+        assert_eq!(status.armor, 0);
+        assert_eq!(status.total_armor, 0);
+    }
+
+    #[test]
+    fn build_status_progress_to_next_correct() {
+        let (db, svc) = setup();
+        create_user(&db, "u1", 7000, 1, 0);
+
+        let status = svc.get_status("u1").unwrap();
+        assert_eq!(status.current_level, 1);
+        assert_eq!(status.progress_to_next, 8000);
+        assert_eq!(status.next_threshold, Some(15000));
+    }
+
+    #[test]
+    fn get_or_create_user_creates_default() {
+        let (_db, svc) = setup();
+        // No user exists initially
+        let user = svc.get_or_create_user().unwrap();
+        assert_eq!(user.id, "default_user");
+        assert_eq!(user.cumulative_faith, 0);
+        assert_eq!(user.current_level, 1);
+        assert_eq!(user.armor_points, 0);
+    }
+
+    #[test]
+    fn get_or_create_user_returns_existing() {
+        let (db, svc) = setup();
+        let now = chrono::Local::now().to_rfc3339();
+        UserRepo::upsert(&*db, &User {
+            id: "default_user".into(),
+            nickname: "Existing".into(),
+            cumulative_faith: 5000,
+            current_level: 1,
+            armor_points: 0,
+            created_at: now.clone(),
+            updated_at: now,
+        }).unwrap();
+
+        let user = svc.get_or_create_user().unwrap();
+        assert_eq!(user.nickname, "Existing");
+        assert_eq!(user.cumulative_faith, 5000);
     }
 }

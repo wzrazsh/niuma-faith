@@ -123,3 +123,44 @@ pub struct FaithTransaction {
     pub ref_id: Option<String>,
     pub message: String,
 }
+
+/// Process information returned by list_processes command
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProcessInfo {
+    pub pid: u32,
+    pub name: String,
+    pub status: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn process_info_json_roundtrip() {
+        let info = ProcessInfo {
+            pid: 1234,
+            name: "notepad.exe".to_string(),
+            status: "Running".to_string(),
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        let parsed: ProcessInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.pid, 1234);
+        assert_eq!(parsed.name, "notepad.exe");
+        assert_eq!(parsed.status, "Running");
+    }
+
+    #[test]
+    fn process_info_json_nullable_fields() {
+        let info = ProcessInfo {
+            pid: 0,
+            name: String::new(),
+            status: String::new(),
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        let parsed: ProcessInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.pid, 0);
+        assert_eq!(parsed.name, "");
+        assert_eq!(parsed.status, "");
+    }
+}

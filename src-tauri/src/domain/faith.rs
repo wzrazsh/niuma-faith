@@ -229,11 +229,7 @@ mod tests {
     fn discipline_break_count_2() {
         // (2, 0, 1) → total=200, a=80, b=60, c=60
         let input = DisciplineInput { break_count: 2, leave_record: 0, close_record: 1 };
-<<<<<<< HEAD
-        let (total, a, b, c) = calc_discipline(input);
-=======
         let (total, a, _, _) = calc_discipline(input);
->>>>>>> 9b39a5137433633932a685cf023060c9e810effc
         assert_eq!(total, 200);
         assert_eq!(a, 80);
     }
@@ -253,11 +249,7 @@ mod tests {
     fn discipline_break_count_4() {
         // (4, 0, 1) → total=160, a=40, b=60, c=60
         let input = DisciplineInput { break_count: 4, leave_record: 0, close_record: 1 };
-<<<<<<< HEAD
-        let (total, a, b, c) = calc_discipline(input);
-=======
         let (total, a, _, _) = calc_discipline(input);
->>>>>>> 9b39a5137433633932a685cf023060c9e810effc
         assert_eq!(total, 160);
         assert_eq!(a, 40);
     }
@@ -266,11 +258,7 @@ mod tests {
     fn discipline_break_count_5() {
         // (5, 0, 1) → total=120, a=0, b=60, c=60
         let input = DisciplineInput { break_count: 5, leave_record: 0, close_record: 1 };
-<<<<<<< HEAD
-        let (total, a, b, c) = calc_discipline(input);
-=======
         let (total, a, _, _) = calc_discipline(input);
->>>>>>> 9b39a5137433633932a685cf023060c9e810effc
         assert_eq!(total, 120);
         assert_eq!(a, 0);
     }
@@ -279,11 +267,7 @@ mod tests {
     fn discipline_leave_record_1() {
         // (0, 1, 1) → total=170, a=80, b=30, c=60
         let input = DisciplineInput { break_count: 0, leave_record: 1, close_record: 1 };
-<<<<<<< HEAD
-        let (total, a, b, c) = calc_discipline(input);
-=======
         let (total, a, b, _) = calc_discipline(input);
->>>>>>> 9b39a5137433633932a685cf023060c9e810effc
         assert_eq!(total, 170);
         assert_eq!(a, 80);
         assert_eq!(b, 30);
@@ -293,11 +277,7 @@ mod tests {
     fn discipline_leave_record_2() {
         // (0, 2, 1) → total=140, a=80, b=0, c=60
         let input = DisciplineInput { break_count: 0, leave_record: 2, close_record: 1 };
-<<<<<<< HEAD
-        let (total, a, b, c) = calc_discipline(input);
-=======
         let (total, _, b, _) = calc_discipline(input);
->>>>>>> 9b39a5137433633932a685cf023060c9e810effc
         assert_eq!(total, 140);
         assert_eq!(b, 0);
     }
@@ -306,11 +286,7 @@ mod tests {
     fn discipline_no_close_record() {
         // (0, 0, 0) → total=140, a=80, b=60, c=0
         let input = DisciplineInput { break_count: 0, leave_record: 0, close_record: 0 };
-<<<<<<< HEAD
-        let (total, a, b, c) = calc_discipline(input);
-=======
         let (total, _, _, c) = calc_discipline(input);
->>>>>>> 9b39a5137433633932a685cf023060c9e810effc
         assert_eq!(total, 140);
         assert_eq!(c, 0);
     }
@@ -400,6 +376,28 @@ mod tests {
         assert_eq!(b.survival_faith, 400);
         assert_eq!(b.progress_faith, 400);
         assert_eq!(b.total(), 1000);
+    }
+
+    // --- calc_survival negative input ---
+
+    #[test]
+    fn survival_neg_1() {
+        assert_eq!(calc_survival(-1), 0);
+    }
+
+    #[test]
+    fn survival_neg_1000() {
+        assert_eq!(calc_survival(-1000), 0);
+    }
+
+    // --- calc_discipline illegal leave_record ---
+
+    #[test]
+    fn discipline_leave_record_99() {
+        let input = DisciplineInput { break_count: 0, leave_record: 99, close_record: 1 };
+        let (total, _, b, _) = calc_discipline(input);
+        assert_eq!(total, 140);
+        assert_eq!(b, 0);
     }
 
     #[test]

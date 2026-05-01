@@ -127,7 +127,7 @@ impl DailyRecordRepo for SqliteDb {
                         survival_faith, progress_faith, discipline_faith, total_faith,
                         break_count, leave_record, close_record,
                         discipline_a, discipline_b, discipline_c,
-                        created_at, updated_at
+                        tasks_completed, created_at, updated_at
                  FROM daily_records WHERE user_id = ? AND date = ?",
             )?;
             let mut rows = stmt.query([user_id, date])?;
@@ -213,9 +213,9 @@ impl TaskRepo for SqliteDb {
     fn create(&self, task: &Task) -> Result<(), RepoError> {
         self.with_conn(|conn| {
             conn.execute(
-                "INSERT INTO tasks (id, user_id, title, description, category, estimated_minutes,
-                 actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+                "INSERT INTO tasks (id, user_id, date, title, description, category, estimated_minutes,
+                         actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at)
+                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
                 rusqlite::params![
                     task.id,
                     task.user_id,
@@ -242,7 +242,7 @@ impl TaskRepo for SqliteDb {
     fn get(&self, id: &str) -> Result<Option<Task>, RepoError> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, user_id, title, description, category, estimated_minutes,
+                "SELECT id, user_id, date, title, description, category, estimated_minutes,
                         actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at
                  FROM tasks WHERE id = ?",
             )?;
@@ -261,7 +261,7 @@ impl TaskRepo for SqliteDb {
                 Some(s) => {
                     let status_str = serde_json::to_string(&s).unwrap();
                     let mut stmt = conn.prepare(
-                        "SELECT id, user_id, title, description, category, estimated_minutes,
+                        "SELECT id, user_id, date, title, description, category, estimated_minutes,
                                 actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at
                          FROM tasks WHERE user_id = ? AND status = ?",
                     )?;
@@ -274,7 +274,7 @@ impl TaskRepo for SqliteDb {
                 }
                 None => {
                     let mut stmt = conn.prepare(
-                        "SELECT id, user_id, title, description, category, estimated_minutes,
+                        "SELECT id, user_id, date, title, description, category, estimated_minutes,
                                 actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at
                          FROM tasks WHERE user_id = ?",
                     )?;
@@ -297,7 +297,6 @@ impl TaskRepo for SqliteDb {
                  actual_minutes=?, status=?, notes=?, started_at=?, completed_at=?, duration_seconds=?, ai_summary=?, updated_at=?
                  WHERE id=?",
                 rusqlite::params![
-                    task.date,
                     task.title,
                     task.description,
                     serde_json::to_string(&task.category).unwrap(),
@@ -389,7 +388,7 @@ impl TaskSessionRepo for SqliteDb {
 
 /// Helper: convert a rusqlite row to a Task.
 fn row_to_task(row: &rusqlite::Row) -> Result<Task, RepoError> {
-    let raw_status: String = row.get(7)?;
+    let raw_status: String = row.get(8)?;
     Ok(Task {
         id: row.get(0)?,
         user_id: row.get(1)?,
@@ -402,13 +401,13 @@ fn row_to_task(row: &rusqlite::Row) -> Result<Task, RepoError> {
         estimated_minutes: row.get(6)?,
         actual_minutes: row.get(7)?,
         status: parse_task_status(&raw_status)?,
-        notes: row.get(8)?,
-        created_at: row.get(9)?,
-        started_at: row.get(10)?,
-        completed_at: row.get(11)?,
-        duration_seconds: row.get(12)?,
-        ai_summary: row.get(13)?,
-        updated_at: row.get(14)?,
+        notes: row.get(9)?,
+        created_at: row.get(10)?,
+        started_at: row.get(11)?,
+        completed_at: row.get(12)?,
+        duration_seconds: row.get(13)?,
+        ai_summary: row.get(14)?,
+        updated_at: row.get(15)?,
     })
 }
 
@@ -512,5 +511,273 @@ mod tests {
         let loaded = UserRepo::get(&db, "u1").unwrap().unwrap();
         assert_eq!(loaded.cumulative_faith, 15_000);
         assert_eq!(loaded.current_level, 2);
+    }
+
+    // --- 5. armor field read/write ---
+
+    #[test]
+    fn upsert_user_persists_armor() {
+        let db = fresh_db();
+        let user = User {
+            id: "u1".into(),
+            nickname: "Knight".into(),
+            cumulative_faith: 5000,
+            current_level: 2,
+            armor_points: 42,
+            created_at: "2026-04-18T00:00:00+08:00".into(),
+            updated_at: "2026-04-18T00:00:00+08:00".into(),
+        };
+        UserRepo::upsert(&db, &user).unwrap();
+        let loaded = UserRepo::get(&db, "u1").unwrap().unwrap();
+        assert_eq!(loaded.armor_points, 42);
+        assert_eq!(loaded.nickname, "Knight");
+    }
+
+    #[test]
+    fn upsert_user_updates_armor() {
+        let db = fresh_db();
+        let user = User {
+            id: "u1".into(),
+            nickname: "".into(),
+            cumulative_faith: 0,
+            current_level: 1,
+            armor_points: 10,
+            created_at: "2026-04-18T00:00:00+08:00".into(),
+            updated_at: "2026-04-18T00:00:00+08:00".into(),
+        };
+        UserRepo::upsert(&db, &user).unwrap();
+
+        let updated = User {
+            id: "u1".into(),
+            nickname: "".into(),
+            cumulative_faith: 0,
+            current_level: 1,
+            armor_points: 2000,
+            created_at: "2026-04-18T00:00:00+08:00".into(),
+            updated_at: "2026-04-19T00:00:00+08:00".into(),
+        };
+        UserRepo::upsert(&db, &updated).unwrap();
+        let loaded = UserRepo::get(&db, "u1").unwrap().unwrap();
+        assert_eq!(loaded.armor_points, 2000);
+    }
+
+    // --- 6. faith_transactions table ---
+
+    #[test]
+    fn insert_and_read_faith_transaction() {
+        let db = fresh_db();
+        let tx = FaithTransaction {
+            id: None,
+            user_id: "u1".into(),
+            ts: "2026-04-18T10:00:00+08:00".into(),
+            delta: 600,
+            armor_delta: 0,
+            kind: "daily_grant".into(),
+            ref_id: Some("2026-04-18".into()),
+            message: "daily faith grant".into(),
+        };
+        FaithTransactionRepo::insert(&db, &tx).unwrap();
+
+        // verify it was inserted by querying via raw SQL
+        db.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT user_id, delta, kind, ref_id, message FROM faith_transactions WHERE user_id = ?",
+            )?;
+            let mut rows = stmt.query(["u1"])?;
+            let row = rows.next()?.unwrap();
+            let user_id: String = row.get(0)?;
+            let delta: i32 = row.get(1)?;
+            let kind: String = row.get(2)?;
+            assert_eq!(user_id, "u1");
+            assert_eq!(delta, 600);
+            assert_eq!(kind, "daily_grant");
+            Ok::<_, RepoError>(())
+        }).unwrap();
+    }
+
+    #[test]
+    fn multiple_faith_transactions() {
+        let db = fresh_db();
+        for i in 1..=3 {
+            FaithTransactionRepo::insert(&db, &FaithTransaction {
+                id: None,
+                user_id: "u1".into(),
+                ts: format!("2026-04-18T10:00:{:02}+08:00", i),
+                delta: i * 200,
+                armor_delta: 0,
+                kind: "daily_grant".into(),
+                ref_id: Some("2026-04-18".into()),
+                message: String::new(),
+            }).unwrap();
+        }
+
+        db.with_conn(|conn| {
+            let count: i32 = conn.query_row(
+                "SELECT COUNT(*) FROM faith_transactions WHERE user_id = ?",
+                ["u1"],
+                |row| row.get(0),
+            )?;
+            assert_eq!(count, 3);
+            Ok::<_, RepoError>(())
+        }).unwrap();
+    }
+
+    // --- 7. task_sessions lifecycle ---
+
+    #[test]
+    fn task_session_create_and_end() {
+        let db = fresh_db();
+        let start_ts = "2026-04-18T10:00:00+08:00";
+        let end_ts = "2026-04-18T11:00:00+08:00";
+
+        TaskSessionRepo::start_session(&db, "task-1", start_ts).unwrap();
+        let seconds = TaskSessionRepo::end_open_session(&db, "task-1", end_ts).unwrap();
+        assert!(seconds > 0, "Should calculate elapsed seconds > 0");
+    }
+
+    #[test]
+    fn task_session_end_without_open_returns_zero() {
+        let db = fresh_db();
+        let seconds = TaskSessionRepo::end_open_session(&db, "nonexistent", "2026-04-18T11:00:00+08:00").unwrap();
+        assert_eq!(seconds, 0);
+    }
+
+    #[test]
+    fn task_session_multiple_start_end_cycles() {
+        let db = fresh_db();
+        let t1 = "2026-04-18T10:00:00+08:00";
+        let t2 = "2026-04-18T10:05:00+08:00";
+        let t3 = "2026-04-18T10:10:00+08:00";
+        let t4 = "2026-04-18T10:18:00+08:00";
+
+        // Session 1: 5 minutes
+        TaskSessionRepo::start_session(&db, "task-1", t1).unwrap();
+        let s1 = TaskSessionRepo::end_open_session(&db, "task-1", t2).unwrap();
+        assert!(s1 >= 299 && s1 <= 301, "Session 1 should be ~300s, got {}", s1);
+
+        // Session 2: 8 minutes
+        TaskSessionRepo::start_session(&db, "task-1", t3).unwrap();
+        let s2 = TaskSessionRepo::end_open_session(&db, "task-1", t4).unwrap();
+        assert!(s2 >= 479 && s2 <= 481, "Session 2 should be ~480s, got {}", s2);
+    }
+
+    // --- 8. concurrent safety (Mutex) ---
+
+    #[test]
+    fn concurrent_user_upserts() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let db = Arc::new(fresh_db());
+        let ts = "2026-04-18T00:00:00+08:00";
+
+        let mut handles = vec![];
+        for i in 0..10 {
+            let db = db.clone();
+            let handle = thread::spawn(move || {
+                let user = User {
+                    id: format!("u{}", i),
+                    nickname: format!("User{}", i),
+                    cumulative_faith: i as i64 * 100,
+                    current_level: 1,
+                    armor_points: 0,
+                    created_at: ts.into(),
+                    updated_at: ts.into(),
+                };
+                UserRepo::upsert(&*db, &user).unwrap();
+            });
+            handles.push(handle);
+        }
+
+        for h in handles {
+            h.join().unwrap();
+        }
+
+        for i in 0..10 {
+            let loaded = UserRepo::get(&*db, &format!("u{}", i)).unwrap().unwrap();
+            assert_eq!(loaded.nickname, format!("User{}", i));
+        }
+    }
+
+    #[test]
+    fn concurrent_faith_transaction_inserts() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let db = Arc::new(fresh_db());
+        let mut handles = vec![];
+        for i in 0..5 {
+            let db = db.clone();
+            let handle = thread::spawn(move || {
+                FaithTransactionRepo::insert(&*db, &FaithTransaction {
+                    id: None,
+                    user_id: format!("u{}", i),
+                    ts: "2026-04-18T10:00:00+08:00".into(),
+                    delta: 100,
+                    armor_delta: 0,
+                    kind: "daily_grant".into(),
+                    ref_id: None,
+                    message: String::new(),
+                }).unwrap();
+            });
+            handles.push(handle);
+        }
+
+        for h in handles {
+            h.join().unwrap();
+        }
+
+        db.with_conn(|conn| {
+            let count: i32 = conn.query_row("SELECT COUNT(*) FROM faith_transactions", [], |row| row.get(0))?;
+            assert_eq!(count, 5);
+            Ok::<_, RepoError>(())
+        }).unwrap();
+    }
+
+    // --- 9. Schema migration idempotency ---
+
+    #[test]
+    fn ensure_column_armor_points_idempotent() {
+        let db = fresh_db();
+        db.with_conn(|conn| {
+            // First call should succeed (column added or already exists)
+            crate::data::schema::ensure_column(conn, "users", "armor_points", "INTEGER NOT NULL DEFAULT 0")?;
+            // Second call should be idempotent — should not error
+            crate::data::schema::ensure_column(conn, "users", "armor_points", "INTEGER NOT NULL DEFAULT 0")?;
+
+            // Verify column exists
+            let mut stmt = conn.prepare("PRAGMA table_info(users)")?;
+            let mut rows = stmt.query([])?;
+            let mut found = false;
+            while let Some(row) = rows.next()? {
+                let name: String = row.get(1)?;
+                if name == "armor_points" {
+                    found = true;
+                }
+            }
+            assert!(found, "armor_points column should exist in users table");
+            Ok::<_, RepoError>(())
+        }).unwrap();
+    }
+
+    #[test]
+    fn ensure_column_new_column_added() {
+        let db = fresh_db();
+        db.with_conn(|conn| {
+            // Add a test column that doesn't exist in the schema
+            crate::data::schema::ensure_column(conn, "users", "test_col", "TEXT").unwrap();
+
+            let mut stmt = conn.prepare("PRAGMA table_info(users)")?;
+            let mut rows = stmt.query([])?;
+            let mut found = false;
+            while let Some(row) = rows.next()? {
+                let name: String = row.get(1)?;
+                if name == "test_col" {
+                    found = true;
+                }
+            }
+            assert!(found, "test_col column should exist after ensure_column");
+            Ok::<_, RepoError>(())
+        }).unwrap();
     }
 }

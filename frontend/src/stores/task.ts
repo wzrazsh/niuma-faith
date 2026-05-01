@@ -32,7 +32,6 @@ export const useTaskStore = defineStore("task", () => {
 
   const runningTasks = computed(() => tasks.value.filter(t => t.status === "running"));
   const pausedTasks = computed(() => tasks.value.filter(t => t.status === "paused"));
-  const activeTasks = computed(() => tasks.value.filter(t => t.status === "running" || t.status === "paused"));
   const completedTasks = computed(() => tasks.value.filter(t => t.status === "completed"));
   const abandonedTasks = computed(() => tasks.value.filter(t => t.status === "abandoned"));
 

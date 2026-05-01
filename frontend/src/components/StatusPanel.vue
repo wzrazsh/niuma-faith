@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useFaithStore } from "@/stores/faith";
+import { formatNumber } from "@/utils/format";
 
 const store = useFaithStore();
 
@@ -19,6 +20,14 @@ const percentToNext = computed(() => {
   const made = cumulativeFaith.value - (store.currentLevel?.cumulative_threshold ?? 0);
   return Math.min(100, Math.max(0, (made / total) * 100));
 });
+
+const armor = computed(() => store.faithStatus?.armor ?? 0);
+const totalArmor = computed(() => store.faithStatus?.total_armor ?? 0);
+
+const armorPercent = computed(() => {
+  if (totalArmor.value <= 0) return 0;
+  return Math.min(100, (armor.value / totalArmor.value) * 100);
+});
 </script>
 
 <template>
@@ -34,9 +43,9 @@ const percentToNext = computed(() => {
         <div class="progress-header">
           <span class="progress-label">距下一级</span>
           <span class="progress-threshold">
-            {{ cumulativeFaith }}
+            {{ formatNumber(cumulativeFaith) }}
             <span class="threshold-sep">/</span>
-            {{ nextThreshold ?? "MAX" }}
+            {{ nextThreshold != null ? formatNumber(nextThreshold) : "MAX" }}
           </span>
         </div>
         <div class="progress-track">
@@ -47,12 +56,29 @@ const percentToNext = computed(() => {
         </div>
         <p v-if="progressNeeded > 0" class="progress-hint">
           再积累
-          <strong>{{ progressNeeded }}</strong>
+          <strong>{{ formatNumber(progressNeeded) }}</strong>
           信仰可升至下一级
         </p>
-        <p v-else class="progress-hint progress-max">
-          已达到最高等级：牛马圣徒
+        <p v-else-if="store.currentLevel.level < 15" class="progress-hint">
+          继续积累即可升级
         </p>
+        <p v-else class="progress-hint progress-max">
+          已达到最高等级 · 牛马圣徒
+        </p>
+      </div>
+
+      <!-- Armor Meter -->
+      <div v-if="totalArmor > 0" class="armor-section">
+        <div class="armor-header">
+          <span class="armor-label">戒律护甲</span>
+          <span class="armor-value">{{ formatNumber(armor) }} / {{ formatNumber(totalArmor) }}</span>
+        </div>
+        <div class="armor-track">
+          <div
+            class="armor-fill"
+            :style="{ width: armorPercent + '%' }"
+          ></div>
+        </div>
       </div>
     </div>
 
@@ -103,7 +129,7 @@ const percentToNext = computed(() => {
     <!-- Cumulative total -->
     <div v-if="store.faithStatus" class="cumulative-stat">
       <span class="stat-label">累计信仰</span>
-      <span class="stat-value">{{ cumulativeFaith }}</span>
+      <span class="stat-value">{{ formatNumber(cumulativeFaith) }}</span>
     </div>
   </section>
 </template>
@@ -302,5 +328,45 @@ const percentToNext = computed(() => {
   color: var(--color-text-muted);
   background: var(--color-surface);
   border-radius: 16px;
+}
+
+/* Armor Meter */
+.armor-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 14px 24px;
+}
+
+.armor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.armor-label {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.armor-value {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.armor-track {
+  height: 8px;
+  background: var(--color-bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.armor-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-discipline), #a78bfa);
+  border-radius: 4px;
+  transition: width 0.6s ease;
 }
 </style>

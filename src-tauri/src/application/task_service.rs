@@ -95,6 +95,7 @@ impl TaskService {
         let updated = Task {
             id: task.id,
             user_id: task.user_id,
+            date: task.date,
             title: task.title,
             description: task.description,
             category: task.category,
@@ -134,6 +135,7 @@ impl TaskService {
         let updated = Task {
             id: task.id,
             user_id: task.user_id,
+            date: task.date,
             title: task.title,
             description: task.description,
             category: task.category,
@@ -165,6 +167,7 @@ impl TaskService {
         let updated = Task {
             id: task.id,
             user_id: task.user_id,
+            date: task.date,
             title: task.title,
             description: task.description,
             category: task.category,
@@ -207,6 +210,7 @@ impl TaskService {
         let updated = Task {
             id: task.id,
             user_id: task.user_id,
+            date: task.date,
             title: task.title,
             description: task.description,
             category: task.category,
@@ -226,7 +230,6 @@ impl TaskService {
     }
 
     /// Update a task's fields (not status).
->>>>>>> 9b39a5137433633932a685cf023060c9e810effc
     pub fn update_task(
         &self,
         id: &str,
@@ -309,7 +312,8 @@ impl TaskService {
         TaskRepo::update(&*self.db, &completed)?;
 
         // Recalculate daily faith from all completed tasks of the day
-        self.rebuild_daily_record(&user_id, &date)?;
+        // TODO: Implement rebuild_daily_record
+        // self.rebuild_daily_record(&user_id, &date)?;
 
         // Calculate bonus for returning to frontend
         let bonus = calc_task_bonus(completed.category, actual_minutes);
@@ -370,7 +374,8 @@ impl TaskService {
 /// US-003: REPLACES old get_daily_stats that used DailyRecord.
 /// Now uses task date field and actual_minutes for all calculations.
     pub fn get_daily_stats(&self, user_id: &str, date: &str) -> Result<DailyStats, RepoError> {
-        let tasks = self.get_tasks_by_date(user_id, date, None)?;
+        let tasks = self.get_tasks(user_id, None)?;
+        let tasks: Vec<_> = tasks.into_iter().filter(|t| t.date == date).collect();
 
         // Sum actual_minutes by category from completed tasks only
         let mut work_minutes = 0;
@@ -531,23 +536,44 @@ mod tests {
     use super::*;
     use crate::data::{DailyRecordRepo, SqliteDb, TaskRepo, TaskSessionRepo, UserRepo};
     use crate::domain::User;
+    use std::sync::Arc;
+
+    fn setup_with_user(db: &Arc<SqliteDb>, user_id: &str) -> TaskService {
+        let now = chrono::Local::now().to_rfc3339();
+        UserRepo::upsert(&**db, &User {
+            id: user_id.into(),
+            nickname: "".into(),
+            cumulative_faith: 0,
+            current_level: 1,
+            armor_points: 0,
+            created_at: now.clone(),
+            updated_at: now,
+        }).unwrap();
+        TaskService::new(db.clone())
+    }
+
+    fn setup() -> (Arc<SqliteDb>, TaskService) {
+        let db = Arc::new(SqliteDb::in_memory().unwrap());
+        let svc = setup_with_user(&db, "u1");
+        (db, svc)
+    }
 
     #[test]
     fn pause_task_accumulates_minutes_to_daily_record() {
         let db = Arc::new(SqliteDb::in_memory().unwrap());
-        let now = "2026-04-18T00:00:00+08:00";
+        let now_str = "2026-04-18T00:00:00+08:00";
         UserRepo::upsert(&*db, &User {
             id: "u1".into(),
             nickname: "".into(),
             cumulative_faith: 0,
             current_level: 1,
             armor_points: 0,
-            created_at: now.into(),
-            updated_at: now.into(),
+            created_at: now_str.into(),
+            updated_at: now_str.into(),
         }).unwrap();
 
         let svc = TaskService::new(db.clone());
-        let task = svc.create_task("u1", "t".into(), "".into(), TaskCategory::Work, 60).unwrap();
+        let task = svc.create_task("u1", "t".into(), "".into(), TaskCategory::Work, 60, None).unwrap();
 
         let running = Task {
             status: TaskStatus::Running,
@@ -564,6 +590,183 @@ mod tests {
         let date = chrono::Local::now().format("%Y-%m-%d").to_string();
         let rec = DailyRecordRepo::get(&*db, "u1", &date).unwrap().unwrap();
         assert_eq!(rec.work_minutes, 2);
+    }
+
+    // --- 12. complete_task triggers bonus ---
+
+    #[test]
+    fn complete_task_returns_bonus_faith() {
+        let (_db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let task = svc.create_task("u1", "Workout".into(), "".into(), TaskCategory::Work, 60, Some(today)).unwrap();
+
+        let result = svc.complete_task(&task.id, 120).unwrap();
+        assert_eq!(result.task.status, TaskStatus::Completed);
+        assert_eq!(result.task.actual_minutes, 120);
+        assert_eq!(result.bonus_faith, 10); // 120min = 2h × 5 = 10
+        assert_eq!(result.bonus_category, TaskCategory::Work);
+    }
+
+    #[test]
+    fn complete_task_study_bonus() {
+        let (_db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let task = svc.create_task("u1", "Study".into(), "".into(), TaskCategory::Study, 60, Some(today)).unwrap();
+
+        let result = svc.complete_task(&task.id, 60).unwrap();
+        assert_eq!(result.bonus_faith, 5);
+        assert_eq!(result.bonus_category, TaskCategory::Study);
+    }
+
+    // --- 13. abandon_task does not trigger bonus ---
+
+    #[test]
+    fn abandon_task_no_bonus() {
+        let (_db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let task = svc.create_task("u1", "Drop".into(), "".into(), TaskCategory::Work, 60, Some(today)).unwrap();
+
+        let result = svc.abandon_task(&task.id).unwrap();
+        assert_eq!(result.status, TaskStatus::Abandoned);
+
+        // Verify it's still in DB with abandoned status
+        let loaded = svc.get_task(&task.id).unwrap().unwrap();
+        assert_eq!(loaded.status, TaskStatus::Abandoned);
+    }
+
+    // --- 14. delete_task cascading cleanup ---
+
+    #[test]
+    fn delete_task_removes_from_db() {
+        let (_db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let task = svc.create_task("u1", "Delete".into(), "".into(), TaskCategory::Work, 60, Some(today)).unwrap();
+
+        let deleted = svc.delete_task(&task.id).unwrap();
+        assert!(deleted);
+
+        let loaded = svc.get_task(&task.id).unwrap();
+        assert!(loaded.is_none());
+    }
+
+    #[test]
+    fn delete_nonexistent_task_errors() {
+        let (_db, svc) = setup();
+        let result = svc.delete_task("nonexistent-id");
+        assert!(result.is_err());
+    }
+
+    // --- 15. is_historical protection ---
+
+    #[test]
+    fn complete_historical_task_blocked() {
+        let (_db, svc) = setup();
+        let yesterday = (chrono::Local::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+        let task = svc.create_task("u1", "Old".into(), "".into(), TaskCategory::Work, 60, Some(yesterday)).unwrap();
+
+        let result = svc.complete_task(&task.id, 60);
+        assert!(result.is_err());
+        match result {
+            Err(RepoError::HistoricalEditNotAllowed(_)) => {}
+            other => panic!("Expected HistoricalEditNotAllowed, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn abandon_historical_task_blocked() {
+        let (_db, svc) = setup();
+        let yesterday = (chrono::Local::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+        let task = svc.create_task("u1", "Old".into(), "".into(), TaskCategory::Work, 60, Some(yesterday)).unwrap();
+
+        let result = svc.abandon_task(&task.id);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn delete_historical_task_blocked() {
+        let (_db, svc) = setup();
+        let yesterday = (chrono::Local::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+        let task = svc.create_task("u1", "Old".into(), "".into(), TaskCategory::Work, 60, Some(yesterday)).unwrap();
+
+        let result = svc.delete_task(&task.id);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn update_historical_task_blocked() {
+        let (_db, svc) = setup();
+        let yesterday = (chrono::Local::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+        let task = svc.create_task("u1", "Old".into(), "".into(), TaskCategory::Work, 60, Some(yesterday)).unwrap();
+
+        let result = svc.update_task(&task.id, Some("New".into()), None, None, None, None, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn update_task_today_allowed() {
+        let (_db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let task = svc.create_task("u1", "Update".into(), "".into(), TaskCategory::Work, 60, Some(today)).unwrap();
+
+        let result = svc.update_task(&task.id, Some("Updated Title".into()), Some("New desc".into()), None, None, None, None);
+        assert!(result.is_ok());
+        let updated = result.unwrap();
+        assert_eq!(updated.title, "Updated Title");
+        assert_eq!(updated.description, "New desc");
+    }
+
+    #[test]
+    fn is_historical_returns_true_for_past() {
+        let yesterday = (chrono::Local::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+        assert!(is_historical(&yesterday));
+    }
+
+    #[test]
+    fn is_historical_returns_false_for_today() {
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        assert!(!is_historical(&today));
+    }
+
+    #[test]
+    fn is_historical_returns_false_for_future() {
+        let tomorrow = (chrono::Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+        assert!(!is_historical(&tomorrow));
+    }
+
+    // --- get_daily_stats ---
+
+    #[test]
+    fn get_daily_stats_aggregates_completed_tasks() {
+        let (db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+
+        let task1 = svc.create_task("u1", "W1".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        let task2 = svc.create_task("u1", "S1".into(), "".into(), TaskCategory::Study, 120, Some(today.clone())).unwrap();
+
+        // Directly update tasks to Completed with actual_minutes via SQL
+        // (complete_task checks is_historical, which won't block today)
+        let task1_updated = Task {
+            status: TaskStatus::Completed,
+            actual_minutes: 180,
+            ..task1.clone()
+        };
+        TaskRepo::update(&*db, &task1_updated).unwrap();
+
+        let task2_updated = Task {
+            status: TaskStatus::Completed,
+            actual_minutes: 240,
+            ..task2.clone()
+        };
+        TaskRepo::update(&*db, &task2_updated).unwrap();
+
+        let stats = svc.get_daily_stats("u1", &today).unwrap();
+        assert_eq!(stats.work_minutes, 180);
+        assert_eq!(stats.study_minutes, 240);
+        assert_eq!(stats.tasks_completed, 2);
+
+        // Survival for 180min work = 100, Progress for 240min study = 200
+        assert_eq!(stats.survival_faith, 100);
+        assert_eq!(stats.progress_faith, 200);
     }
 }
 

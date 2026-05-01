@@ -8,6 +8,7 @@ const faithStore = useFaithStore();
 
 const WORK_TARGET_MINUTES = 480;
 const STUDY_TARGET_MINUTES = 480;
+const DAILY_FAITH_MAX = 1000;
 
 onMounted(async () => {
   const today = new Date().toISOString().slice(0, 10);
@@ -28,6 +29,8 @@ const studyProgress = computed(() => {
 
 const workMinutes = computed(() => faithStore.todayRecord?.work_minutes ?? 0);
 const studyMinutes = computed(() => faithStore.todayRecord?.study_minutes ?? 0);
+
+const todayTotalFaith = computed(() => faithStore.todayRecord?.total_faith ?? 0);
 
 function formatMin(min: number): string {
   const h = Math.floor(min / 60);
@@ -75,6 +78,10 @@ function formatMin(min: number): string {
         <span v-if="taskStore.dailyStats.task_bonus_study > 0" class="bonus-tag study">学习 +{{ taskStore.dailyStats.task_bonus_study }}</span>
         <span v-if="taskStore.dailyStats.task_bonus_work === 0 && taskStore.dailyStats.task_bonus_study === 0" class="bonus-none">无</span>
       </span>
+    </div>
+
+    <div class="faith-max-hint">
+      每日信仰上限: {{ DAILY_FAITH_MAX }} · 今日已获: {{ todayTotalFaith }}
     </div>
   </section>
 </template>
@@ -176,5 +183,14 @@ function formatMin(min: number): string {
 .bonus-none {
   font-size: 0.75rem;
   color: var(--color-text-muted);
+}
+
+.faith-max-hint {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-align: center;
 }
 </style>

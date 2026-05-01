@@ -33,3 +33,6 @@ npm-debug.log*
 .omc
 .claude
 .history
+test-output/
+prd.json
+progress.txt

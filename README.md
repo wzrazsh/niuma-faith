@@ -9,6 +9,8 @@ A gamified productivity desktop app built with Tauri + Vue 3. Users complete tas
 - **日历模式** — 月/周/日三种视图，点击日期管理任务
 - **历史保护** — 今日之前任务和积分锁定，不可修改
 - **等级系统** — 15 级信仰等级，见习牛马 → 牛马圣徒
+- **看板系统** — 拖拽式任务看板（待办/进行中/暂停中/已完成 + 自定义列），支持计时器
+- **进程绑定** — 看板卡片可绑定 Windows 进程，进程启动/退出时自动开始/暂停任务
 
 ## Tech Stack
 
@@ -46,9 +48,16 @@ npm run tauri build
 | `components/TaskList.vue` | 任务列表（含只读模式） |
 | `components/TaskForm.vue` | 任务创建/编辑表单 |
 | `components/FaithDashboard.vue` | 当日信仰积分统计 |
+| `components/kanban/KanbanBoard.vue` | 看板主容器（进程轮询、拖拽放置） |
+| `components/kanban/KanbanColumn.vue` | 看板列 |
+| `components/kanban/KanbanCard.vue` | 看板卡片（计时器、进程绑定） |
+| `components/KanbanPage.vue` | 看板页面包装 |
 | `stores/task.ts` | Pinia store：任务状态 + selectedDate |
 | `stores/faith.ts` | Pinia store：用户信仰状态 |
+| `stores/kanban.ts` | Pinia store：看板状态 |
 | `api/task.ts` | Tauri 任务命令封装 |
+| `services/process-detector.ts` | 进程检测服务（Windows tasklist） |
+| `services/kanban-api.ts` | 看板配置持久化 (localStorage) |
 | `types/index.ts` | TypeScript 类型定义 |
 
 ### Backend (`src-tauri/src/`)
@@ -61,7 +70,7 @@ npm run tauri build
 | **Application** | `application/task_service.rs` | 任务业务逻辑 |
 | **Data** | `data/sqlite.rs` | SQLite 实现 |
 | **Data** | `data/repository.rs` | Repo traits |
-| **Tauri** | `main.rs` | 命令定义和注册 |
+| **Tauri** | `main.rs` | 命令定义和注册（含进程检测 is_process_running, list_processes） |
 
 ## 信仰计算
 

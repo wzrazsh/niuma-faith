@@ -1,12 +1,15 @@
 <!-- frontend/src/components/kanban/KanbanCard.vue -->
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from 'vue';
-import type { Task } from '@/types';
+import type { Task, TaskStatus } from '@/types';
+import type { ProcessBinding } from '@/types/kanban';
 import { useKanbanStore } from '@/stores/kanban';
 
 const props = defineProps<{
   task: Task;
   readonly?: boolean;
+  processBinding?: ProcessBinding;
+  isProcessRunning?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -15,10 +18,16 @@ const emit = defineEmits<{
   (e: 'complete', task: Task): void;
   (e: 'edit', task: Task): void;
   (e: 'delete', task: Task): void;
+  (e: 'bind-process', task: Task, binding: ProcessBinding): void;
+  (e: 'unbind-process', task: Task): void;
 }>();
 
 const store = useKanbanStore();
 const elapsedSeconds = ref(0);
+const showBindForm = ref(false);
+const bindAppName = ref('');
+const bindAutoStart = ref(true);
+const bindAutoPause = ref(true);
 let updateInterval: number | null = null;
 
 const categoryLabel = computed(() => {
@@ -27,7 +36,7 @@ const categoryLabel = computed(() => {
   return '其他';
 });
 
-const isActive = computed(() => props.task.status === 'active');
+const isActive = computed(() => props.task.status === ('active' as TaskStatus));
 
 function formatMinutes(min: number): string {
   if (min < 60) return `${min}min`;
@@ -66,8 +75,22 @@ function handleDragStart(e: DragEvent) {
   }
 }
 
+function handleBind() {
+  const name = bindAppName.value.trim();
+  if (!name) return;
+  emit('bind-process', props.task, {
+    appName: name,
+    autoStart: bindAutoStart.value,
+    autoPause: bindAutoPause.value,
+  });
+  showBindForm.value = false;
+  bindAppName.value = '';
+  bindAutoStart.value = true;
+  bindAutoPause.value = true;
+}
+
 watch(() => props.task.status, (newStatus) => {
-  if (newStatus === 'active' && store.activeTimers.has(props.task.id)) {
+  if (newStatus === ('active' as TaskStatus) && store.activeTimers.has(props.task.id)) {
     startElapsedUpdate();
   } else {
     stopElapsedUpdate();
@@ -100,7 +123,35 @@ onUnmounted(() => {
     <div v-if="isActive && store.activeTimers.has(task.id)" class="card-timer">
       {{ formatElapsed(elapsedSeconds) }}
     </div>
-    
+
+    <div v-if="!readonly" class="card-process">
+      <div v-if="processBinding" class="process-binding">
+        <span class="process-dot" :class="{ running: isProcessRunning }" />
+        <span class="process-name">{{ processBinding.appName }}</span>
+        <template v-if="isProcessRunning">运行中</template>
+        <template v-else>未运行</template>
+        <button class="action-btn unbind" @click.stop="emit('unbind-process', task)">解绑</button>
+      </div>
+      <button v-else class="action-btn bind" @click.stop="showBindForm = !showBindForm">+ 绑定进程</button>
+
+      <div v-if="showBindForm" class="bind-form">
+        <input
+          v-model="bindAppName"
+          placeholder="进程名 (如 notepad.exe)"
+          class="bind-input"
+          @keyup.enter="handleBind"
+        />
+        <div class="bind-options">
+          <label class="bind-check"><input v-model="bindAutoStart" type="checkbox" /> 自动开始</label>
+          <label class="bind-check"><input v-model="bindAutoPause" type="checkbox" /> 自动暂停</label>
+        </div>
+        <div class="bind-buttons">
+          <button class="action-btn bind-confirm" @click.stop="handleBind">确定</button>
+          <button class="action-btn bind-cancel" @click.stop="showBindForm = false">取消</button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="!readonly" class="card-actions">
       <template v-if="isActive">
         <button class="action-btn pause" @click="emit('pause', task)">暂停</button>
@@ -198,4 +249,107 @@ onUnmounted(() => {
 .action-btn.complete { background: var(--color-discipline); color: #1a1a24; }
 .action-btn.edit { background: var(--color-bg); border: 1px solid var(--color-border); color: var(--color-text); }
 .action-btn.delete { background: transparent; color: #e06040; }
+
+.card-process {
+  margin-bottom: 8px;
+}
+
+.process-binding {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.process-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #666;
+  flex-shrink: 0;
+}
+
+.process-dot.running {
+  background: #10b981;
+  box-shadow: 0 0 4px #10b981;
+}
+
+.process-name {
+  font-family: monospace;
+  font-weight: 500;
+}
+
+.action-btn.bind {
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.action-btn.unbind {
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  padding: 2px 6px;
+}
+
+.bind-form {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bind-input {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.bind-input:focus {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.bind-options {
+  display: flex;
+  gap: 12px;
+}
+
+.bind-check {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.bind-check input {
+  accent-color: var(--color-primary);
+}
+
+.bind-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.action-btn.bind-confirm {
+  background: var(--color-primary);
+  color: #1a1a24;
+  padding: 3px 10px;
+  font-size: 0.7rem;
+}
+
+.action-btn.bind-cancel {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  padding: 3px 10px;
+  font-size: 0.7rem;
+}
 </style>

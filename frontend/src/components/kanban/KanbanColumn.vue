@@ -1,7 +1,7 @@
 <!-- frontend/src/components/kanban/KanbanColumn.vue -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import type { KanbanColumn } from '@/types/kanban';
+import type { KanbanColumn, ProcessBinding } from '@/types/kanban';
 import type { Task } from '@/types';
 import KanbanCard from './KanbanCard.vue';
 
@@ -9,17 +9,15 @@ const props = defineProps<{
   column: KanbanColumn;
   tasks: Task[];
   readonly?: boolean;
+  processBindings?: Map<string, ProcessBinding | undefined>;
+  processRunning?: Map<string, boolean>;
 }>();
 
 const emit = defineEmits<{
   (e: 'card-drop', taskId: string, toColumnId: string, newOrder: number): void;
-  (e: 'card-start', task: Task): void;
-  (e: 'card-pause', task: Task): void;
-  (e: 'card-complete', task: Task): void;
-  (e: 'card-edit', task: Task): void;
-  (e: 'card-delete', task: Task): void;
-  (e: 'delete-column', columnId: string): void;
-  (e: 'add-task', columnId: string): void;
+  (e: 'card-start' | 'card-pause' | 'card-complete' | 'card-edit' | 'card-delete' | 'unbind-process', task: Task): void;
+  (e: 'add-task' | 'delete-column', id: string): void;
+  (e: 'bind-process', task: Task, binding: ProcessBinding): void;
 }>();
 
 const isDragOver = ref(false);
@@ -89,11 +87,15 @@ function handleDrop(e: DragEvent) {
             :key="task.id"
             :task="task"
             :readonly="readonly"
+            :process-binding="processBindings?.get(task.id)"
+            :is-process-running="processRunning?.get(task.id) ?? false"
             @start="(t) => emit('card-start', t)"
             @pause="(t) => emit('card-pause', t)"
             @complete="(t) => emit('card-complete', t)"
             @edit="(t) => emit('card-edit', t)"
             @delete="(t) => emit('card-delete', t)"
+            @bind-process="(t, b) => emit('bind-process', t, b)"
+            @unbind-process="(t) => emit('unbind-process', t)"
           />
           
           <div v-if="tasks.length === 0" class="column-empty">
