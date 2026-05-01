@@ -1,15 +1,14 @@
 <template>
   <div
-    class="floating-icon"
+    class="level-circle"
     role="button"
-    aria-label="打开牛马信仰主窗口"
-    @mousedown="startDrag"
-    @click="showMain"
+    aria-label="双击打开牛马信仰主窗口"
+    title="拖动移动 / 双击打开主窗口"
+    @mousedown="onMouseDown"
+    @dblclick="showMain"
   >
-    <div class="level-circle">
-      <span class="level-text">Lv.{{ status?.current_level || 1 }}</span>
-      <span class="faith-text">{{ status?.cumulative_faith || 0 }}</span>
-    </div>
+    <span class="level-text">Lv.{{ status?.current_level || 1 }}</span>
+    <span class="faith-text">{{ status?.cumulative_faith || 0 }}</span>
   </div>
 </template>
 
@@ -22,8 +21,31 @@ import type { FaithStatus } from '@/types';
 const status = ref<FaithStatus | null>(null);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-function startDrag(_e: MouseEvent) {
-  getCurrentWindow().startDragging();
+const DRAG_THRESHOLD_PX = 4;
+let downPos: { x: number; y: number } | null = null;
+let dragStarted = false;
+
+function onMouseDown(e: MouseEvent) {
+  if (e.button !== 0) return;
+  downPos = { x: e.screenX, y: e.screenY };
+  dragStarted = false;
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp, { once: true });
+}
+
+function onMouseMove(e: MouseEvent) {
+  if (!downPos || dragStarted) return;
+  const dx = e.screenX - downPos.x;
+  const dy = e.screenY - downPos.y;
+  if (dx * dx + dy * dy >= DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+    dragStarted = true;
+    getCurrentWindow().startDragging();
+  }
+}
+
+function onMouseUp() {
+  downPos = null;
+  window.removeEventListener('mousemove', onMouseMove);
 }
 
 async function loadStatus() {
@@ -51,23 +73,14 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer);
+  window.removeEventListener('mousemove', onMouseMove);
 });
 </script>
 
 <style scoped>
-.floating-icon {
-  width: 80px;
-  height: 80px;
-  cursor: grab;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  user-select: none;
-}
-
 .level-circle {
-  width: 56px;
-  height: 56px;
+  width: 100vw;
+  height: 100vh;
   border-radius: 50%;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   border: 2px solid rgba(255, 215, 0, 0.4);
@@ -76,8 +89,11 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
   overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  box-sizing: border-box;
 }
 
 .level-circle:hover {
@@ -110,9 +126,12 @@ onUnmounted(() => {
 <style>
 html, body, #app {
   background: transparent !important;
+  background-color: transparent !important;
   margin: 0;
   padding: 0;
-  min-height: auto !important;
+  width: 100%;
+  height: 100%;
+  min-height: 0 !important;
   overflow: hidden;
 }
 </style>

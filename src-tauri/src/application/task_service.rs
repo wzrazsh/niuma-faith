@@ -80,6 +80,17 @@ impl TaskService {
         TaskRepo::get_by_user(&*self.db, user_id, status)
     }
 
+    /// Get tasks for a user on a specific date (YYYY-MM-DD), optionally filtered by status.
+    pub fn get_tasks_by_date(
+        &self,
+        user_id: &str,
+        date: &str,
+        status: Option<TaskStatus>,
+    ) -> Result<Vec<Task>, RepoError> {
+        let tasks = TaskRepo::get_by_user(&*self.db, user_id, status)?;
+        Ok(tasks.into_iter().filter(|t| t.date == date).collect())
+    }
+
     pub fn start_task(&self, id: &str) -> Result<Task, RepoError> {
         let task = TaskRepo::get(&*self.db, id)?
             .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;

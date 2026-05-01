@@ -34,6 +34,7 @@ const pollingCleanups = ref<Map<string, () => void>>(new Map());
 
 onMounted(async () => {
   await store.loadBoardConfig();
+  store.reconcileWithTasks(props.tasks);
   await loadCardConfigs();
   reminderService.start();
   registerTaskReminders();
@@ -46,6 +47,7 @@ onUnmounted(() => {
 
 // 监听任务变化，重新注册提醒
 watch(() => props.tasks, () => {
+  store.reconcileWithTasks(props.tasks);
   loadCardConfigs();
   registerTaskReminders();
 });

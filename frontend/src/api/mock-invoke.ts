@@ -126,7 +126,7 @@ const handlers: Record<string, Function> = {
       actual_minutes: 0,
       notes: '',
       date: args.date ?? todayStr(),
-      status: 'pending',
+      status: 'paused',
       created_at: now,
       updated_at: now,
       completed_at: null,

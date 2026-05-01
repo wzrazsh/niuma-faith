@@ -62,6 +62,7 @@ export type TaskStatus = 'running' | 'paused' | 'completed' | 'abandoned';
 export interface Task {
   id: string;
   user_id: string;
+  date: string;
   title: string;
   description: string;
   category: TaskCategory;

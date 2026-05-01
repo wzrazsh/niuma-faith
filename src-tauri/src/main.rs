@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, WebviewUrl, WebviewWindowBuilder,
+    Manager, PhysicalSize, WebviewUrl, WebviewWindowBuilder,
 };
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -83,15 +83,16 @@ async fn get_tasks_by_date(
     date: String,
     status: Option<String>,
 ) -> Result<Vec<Task>, String> {
-    let status_filter = status.map(|s| match s.as_str() {
-        "active" => Some(TaskStatus::Paused),
+    let status_filter = status.and_then(|s| match s.as_str() {
+        "running" => Some(TaskStatus::Running),
+        "paused" => Some(TaskStatus::Paused),
         "completed" => Some(TaskStatus::Completed),
         "abandoned" => Some(TaskStatus::Abandoned),
         _ => None,
-    }).flatten();
+    });
     state
         .task_service
-        .get_tasks(&user_id, status_filter)
+        .get_tasks_by_date(&user_id, &date, status_filter)
         .map_err(|e| e.to_string())
 }
 
@@ -102,14 +103,13 @@ async fn get_tasks(
     user_id: String,
     status: Option<String>,
 ) -> Result<Vec<Task>, String> {
-    let status_filter = status.map(|s| match s.as_str() {
-        "active" => Some(TaskStatus::Paused),
+    let status_filter = status.and_then(|s| match s.as_str() {
         "running" => Some(TaskStatus::Running),
         "paused" => Some(TaskStatus::Paused),
         "completed" => Some(TaskStatus::Completed),
         "abandoned" => Some(TaskStatus::Abandoned),
         _ => None,
-    }).flatten();
+    });
     state
         .task_service
         .get_tasks(&user_id, status_filter)
@@ -239,16 +239,19 @@ async fn open_floating_widget(app: tauri::AppHandle) -> Result<(), String> {
         window.set_focus().map_err(|e| e.to_string())?;
         return Ok(());
     }
-    WebviewWindowBuilder::new(&app, "floating", WebviewUrl::App("/#/floating".into()))
+    let window = WebviewWindowBuilder::new(&app, "floating", WebviewUrl::App("/#/floating".into()))
         .title("牛马信仰 悬浮")
         .inner_size(80.0, 80.0)
+        .min_inner_size(40.0, 40.0)
         .resizable(false)
         .always_on_top(true)
         .decorations(false)
         .skip_taskbar(true)
         .transparent(true)
+        .shadow(false)
         .build()
         .map_err(|e| e.to_string())?;
+    let _ = window.set_size(PhysicalSize::new(80u32, 80u32));
     Ok(())
 }
 
@@ -265,8 +268,9 @@ async fn close_floating_widget(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 async fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
         let _ = window.show();
-        window.set_focus().map_err(|e| e.to_string())?;
+        let _ = window.set_focus();
     } else {
         WebviewWindowBuilder::new(&app, "main", WebviewUrl::App("/".into()))
             .title("牛马信仰")

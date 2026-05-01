@@ -1,6 +1,7 @@
 // frontend/src/stores/kanban.ts
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import type { Task } from '@/types';
 import type { KanbanColumn, KanbanCard } from '@/types/kanban';
 import { kanbanApi } from '@/services/kanban-api';
 
@@ -113,9 +114,48 @@ export const useKanbanStore = defineStore('kanban', () => {
   function removeColumn(columnId: string) {
     const col = columns.value.find(c => c.id === columnId);
     if (!col || !col.isCustom) return;
-    
+
     columns.value = columns.value.filter(c => c.id !== columnId);
     saveBoardConfig();
+  }
+
+  function defaultColumnFor(task: Task): string | undefined {
+    if (task.status === 'completed' || task.status === 'abandoned') return 'done';
+    if (task.status === 'running') return 'doing';
+    if (task.status === 'paused' && task.started_at) return 'paused';
+    return 'todo';
+  }
+
+  function reconcileWithTasks(tasks: Task[]) {
+    if (columns.value.length === 0) return;
+
+    const taskById = new Map(tasks.map(t => [t.id, t]));
+    let dirty = false;
+
+    for (const col of columns.value) {
+      const next = col.taskIds.filter(id => taskById.has(id));
+      if (next.length !== col.taskIds.length) {
+        col.taskIds = next;
+        dirty = true;
+      }
+    }
+
+    const placed = new Set<string>();
+    for (const col of columns.value) {
+      for (const id of col.taskIds) placed.add(id);
+    }
+
+    const fallback = columns.value[0];
+    for (const task of tasks) {
+      if (placed.has(task.id)) continue;
+      const targetId = defaultColumnFor(task);
+      const target = columns.value.find(c => c.id === targetId) ?? fallback;
+      target.taskIds.push(task.id);
+      placed.add(task.id);
+      dirty = true;
+    }
+
+    if (dirty) saveBoardConfig();
   }
 
   return {
@@ -134,5 +174,6 @@ export const useKanbanStore = defineStore('kanban', () => {
     addColumn,
     addCardToColumn,
     removeColumn,
+    reconcileWithTasks,
   };
 });
