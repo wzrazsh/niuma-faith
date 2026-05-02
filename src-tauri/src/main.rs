@@ -70,23 +70,14 @@ async fn create_task(
     if estimated_minutes <= 0 {
         return Err("estimated_minutes must be > 0".into());
     }
-    let mut result = state
+    let rec = match recurrence_kind.as_deref() {
+        Some("daily") => RecurrenceKind::Daily,
+        _ => RecurrenceKind::None,
+    };
+    state
         .task_service
-        .create_task(&user_id, title, description, cat, estimated_minutes, date)
-        .map_err(|e| e.to_string())?;
-    if let Some(kind_str) = recurrence_kind {
-        let kind = match kind_str.as_str() {
-            "daily" => RecurrenceKind::Daily,
-            "none" | _ => RecurrenceKind::None,
-        };
-        if kind != RecurrenceKind::None {
-            result = state
-                .task_service
-                .set_task_recurrence(&result.id, kind)
-                .map_err(|e| e.to_string())?;
-        }
-    }
-    Ok(result)
+        .create_task(&user_id, title, description, cat, estimated_minutes, date, rec)
+        .map_err(|e| e.to_string())
 }
 
 /// 6. get_tasks_by_date — get tasks for a user on a specific date

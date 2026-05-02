@@ -86,6 +86,7 @@ function handleDrop(e: DragEvent) {
             v-for="task in tasks"
             :key="task.id"
             :task="task"
+            :column-id="column.id"
             :readonly="readonly"
             :process-binding="processBindings?.get(task.id)"
             :is-process-running="processRunning?.get(task.id) ?? false"

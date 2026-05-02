@@ -1,7 +1,7 @@
 // src-tauri/src/tauri/commands.rs
 //! Tauri command handlers (shared for testing and runtime)
 
-use crate::domain::{DailyRecord, DailyStats, DisciplineInput, FaithStatus, Task, TaskCategory, TaskCompleteResult, User, ProcessInfo};
+use crate::domain::{DailyRecord, DailyStats, DisciplineInput, FaithStatus, RecurrenceKind, Task, TaskCategory, TaskCompleteResult, User, ProcessInfo};
 use crate::tauri::state::AppState;
 
 /// 1. get_status — retrieve current cumulative faith + level + today's record
@@ -145,6 +145,7 @@ pub async fn create_task(
     category: String,
     estimated_minutes: i32,
     date: Option<String>,
+    recurrence_kind: Option<String>,
 ) -> Result<Task, String> {
     let cat = match category.as_str() {
         "work" => TaskCategory::Work,
@@ -155,9 +156,13 @@ pub async fn create_task(
     if estimated_minutes <= 0 {
         return Err("estimated_minutes must be > 0".into());
     }
+    let rec = match recurrence_kind.as_deref() {
+        Some("daily") => RecurrenceKind::Daily,
+        _ => RecurrenceKind::None,
+    };
     state
         .task_service
-        .create_task(&user_id, title, description, cat, estimated_minutes, date)
+        .create_task(&user_id, title, description, cat, estimated_minutes, date, rec)
         .map_err(|e| e.to_string())
 }
 
@@ -344,6 +349,7 @@ mod tests {
                 "work".to_string(),
                 60,
                 None,
+                None,
             )
         );
 
@@ -370,6 +376,7 @@ mod tests {
                 "invalid_category".to_string(),
                 60,
                 None,
+                None,
             )
         );
 
@@ -390,6 +397,7 @@ mod tests {
                 "work".to_string(),
                 0,
                 None,
+                None,
             )
         );
 
@@ -409,6 +417,7 @@ mod tests {
                 "".to_string(),
                 "study".to_string(),
                 30,
+                None,
                 None,
             )
         );
@@ -437,6 +446,7 @@ mod tests {
                 "".to_string(),
                 "work".to_string(),
                 45,
+                None,
                 None,
             )
         );
@@ -468,6 +478,7 @@ mod tests {
                 "".to_string(),
                 "work".to_string(),
                 60,
+                None,
                 None,
             )
         );
@@ -502,6 +513,7 @@ mod tests {
                 "Full workflow test".to_string(),
                 "study".to_string(),
                 90,
+                None,
                 None,
             )
         );
@@ -689,7 +701,7 @@ mod tests {
         // Create and complete a task
         let task_result = tauri::async_runtime::block_on(create_task(
             make_state(&state), user_id.clone(),
-            "Stat Task".into(), "".into(), "work".into(), 120, Some(today.clone()),
+            "Stat Task".into(), "".into(), "work".into(), 120, Some(today.clone()), None,
         )).unwrap();
 
         // Complete via direct service call to set actual_minutes
@@ -712,7 +724,7 @@ mod tests {
 
         let task_result = tauri::async_runtime::block_on(create_task(
             make_state(&state), user_id.clone(),
-            "Old Title".into(), "".into(), "work".into(), 60, Some(today),
+            "Old Title".into(), "".into(), "work".into(), 60, Some(today), None,
         )).unwrap();
 
         let result = tauri::async_runtime::block_on(
@@ -742,7 +754,7 @@ mod tests {
 
         let task_result = tauri::async_runtime::block_on(create_task(
             make_state(&state), user_id.clone(),
-            "Complete Me".into(), "".into(), "work".into(), 60, Some(today),
+            "Complete Me".into(), "".into(), "work".into(), 60, Some(today), None,
         )).unwrap();
 
         let result = tauri::async_runtime::block_on(
@@ -762,7 +774,7 @@ mod tests {
 
         let task_result = tauri::async_runtime::block_on(create_task(
             make_state(&state), user_id.clone(),
-            "Abandon Me".into(), "".into(), "study".into(), 30, Some(today),
+            "Abandon Me".into(), "".into(), "study".into(), 30, Some(today), None,
         )).unwrap();
 
         let result = tauri::async_runtime::block_on(
@@ -781,7 +793,7 @@ mod tests {
 
         let task_result = tauri::async_runtime::block_on(create_task(
             make_state(&state), user_id.clone(),
-            "Delete Me".into(), "".into(), "other".into(), 30, Some(today),
+            "Delete Me".into(), "".into(), "other".into(), 30, Some(today), None,
         )).unwrap();
 
         let result = tauri::async_runtime::block_on(
@@ -845,6 +857,7 @@ mod tests {
                 "work".into(),
                 60,
                 None,
+                None,
             )
         );
         // create_task doesn't validate user existence, so it may succeed or fail
@@ -862,7 +875,7 @@ mod tests {
 
         let task_result = tauri::async_runtime::block_on(create_task(
             make_state(&state), user_id,
-            "Status Test".into(), "".into(), "work".into(), 60, Some(today),
+            "Status Test".into(), "".into(), "work".into(), 60, Some(today), None,
         )).unwrap();
 
         let result = tauri::async_runtime::block_on(

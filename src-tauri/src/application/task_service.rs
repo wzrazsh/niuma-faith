@@ -40,6 +40,7 @@ impl TaskService {
         category: TaskCategory,
         estimated_minutes: i32,
         date: Option<String>,
+        recurrence_kind: RecurrenceKind,
     ) -> Result<Task, RepoError> {
         let now = chrono::Utc::now();
         let now_ts = now.to_rfc3339();
@@ -60,7 +61,7 @@ impl TaskService {
             duration_seconds: 0,
             ai_summary: None,
             updated_at: now_ts,
-            recurrence_kind: RecurrenceKind::None,
+            recurrence_kind,
             template_id: None,
         };
         TaskRepo::create(&*self.db, &task)?;
@@ -733,7 +734,7 @@ mod tests {
         }).unwrap();
 
         let svc = TaskService::new(db.clone());
-        let task = svc.create_task("u1", "t".into(), "".into(), TaskCategory::Work, 60, None).unwrap();
+        let task = svc.create_task("u1", "t".into(), "".into(), TaskCategory::Work, 60, None, RecurrenceKind::None).unwrap();
 
         let running = Task {
             status: TaskStatus::Running,
@@ -758,7 +759,7 @@ mod tests {
     fn complete_task_returns_bonus_faith() {
         let (_db, svc) = setup();
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let task = svc.create_task("u1", "Workout".into(), "".into(), TaskCategory::Work, 60, Some(today)).unwrap();
+        let task = svc.create_task("u1", "Workout".into(), "".into(), TaskCategory::Work, 60, Some(today), RecurrenceKind::None).unwrap();
 
         let result = svc.complete_task(&task.id, 120).unwrap();
         assert_eq!(result.task.status, TaskStatus::Completed);
@@ -771,7 +772,7 @@ mod tests {
     fn complete_task_study_bonus() {
         let (_db, svc) = setup();
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let task = svc.create_task("u1", "Study".into(), "".into(), TaskCategory::Study, 60, Some(today)).unwrap();
+        let task = svc.create_task("u1", "Study".into(), "".into(), TaskCategory::Study, 60, Some(today), RecurrenceKind::None).unwrap();
 
         let result = svc.complete_task(&task.id, 60).unwrap();
         assert_eq!(result.bonus_faith, 5);
@@ -784,7 +785,7 @@ mod tests {
     fn abandon_task_no_bonus() {
         let (_db, svc) = setup();
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let task = svc.create_task("u1", "Drop".into(), "".into(), TaskCategory::Work, 60, Some(today)).unwrap();
+        let task = svc.create_task("u1", "Drop".into(), "".into(), TaskCategory::Work, 60, Some(today), RecurrenceKind::None).unwrap();
 
         let result = svc.abandon_task(&task.id).unwrap();
         assert_eq!(result.status, TaskStatus::Abandoned);
@@ -800,7 +801,7 @@ mod tests {
     fn delete_task_removes_from_db() {
         let (_db, svc) = setup();
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let task = svc.create_task("u1", "Delete".into(), "".into(), TaskCategory::Work, 60, Some(today)).unwrap();
+        let task = svc.create_task("u1", "Delete".into(), "".into(), TaskCategory::Work, 60, Some(today), RecurrenceKind::None).unwrap();
 
         let deleted = svc.delete_task(&task.id).unwrap();
         assert!(deleted);
@@ -822,7 +823,7 @@ mod tests {
     fn complete_historical_task_blocked() {
         let (_db, svc) = setup();
         let yesterday = (chrono::Local::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
-        let task = svc.create_task("u1", "Old".into(), "".into(), TaskCategory::Work, 60, Some(yesterday)).unwrap();
+        let task = svc.create_task("u1", "Old".into(), "".into(), TaskCategory::Work, 60, Some(yesterday), RecurrenceKind::None).unwrap();
 
         let result = svc.complete_task(&task.id, 60);
         assert!(result.is_err());
@@ -836,7 +837,7 @@ mod tests {
     fn abandon_historical_task_blocked() {
         let (_db, svc) = setup();
         let yesterday = (chrono::Local::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
-        let task = svc.create_task("u1", "Old".into(), "".into(), TaskCategory::Work, 60, Some(yesterday)).unwrap();
+        let task = svc.create_task("u1", "Old".into(), "".into(), TaskCategory::Work, 60, Some(yesterday), RecurrenceKind::None).unwrap();
 
         let result = svc.abandon_task(&task.id);
         assert!(result.is_err());
@@ -846,7 +847,7 @@ mod tests {
     fn delete_historical_task_blocked() {
         let (_db, svc) = setup();
         let yesterday = (chrono::Local::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
-        let task = svc.create_task("u1", "Old".into(), "".into(), TaskCategory::Work, 60, Some(yesterday)).unwrap();
+        let task = svc.create_task("u1", "Old".into(), "".into(), TaskCategory::Work, 60, Some(yesterday), RecurrenceKind::None).unwrap();
 
         let result = svc.delete_task(&task.id);
         assert!(result.is_err());
@@ -856,7 +857,7 @@ mod tests {
     fn update_historical_task_blocked() {
         let (_db, svc) = setup();
         let yesterday = (chrono::Local::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
-        let task = svc.create_task("u1", "Old".into(), "".into(), TaskCategory::Work, 60, Some(yesterday)).unwrap();
+        let task = svc.create_task("u1", "Old".into(), "".into(), TaskCategory::Work, 60, Some(yesterday), RecurrenceKind::None).unwrap();
 
         let result = svc.update_task(&task.id, Some("New".into()), None, None, None, None, None);
         assert!(result.is_err());
@@ -866,7 +867,7 @@ mod tests {
     fn update_task_today_allowed() {
         let (_db, svc) = setup();
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let task = svc.create_task("u1", "Update".into(), "".into(), TaskCategory::Work, 60, Some(today)).unwrap();
+        let task = svc.create_task("u1", "Update".into(), "".into(), TaskCategory::Work, 60, Some(today), RecurrenceKind::None).unwrap();
 
         let result = svc.update_task(&task.id, Some("Updated Title".into()), Some("New desc".into()), None, None, None, None);
         assert!(result.is_ok());
@@ -900,8 +901,8 @@ mod tests {
         let (db, svc) = setup();
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
 
-        let task1 = svc.create_task("u1", "W1".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
-        let task2 = svc.create_task("u1", "S1".into(), "".into(), TaskCategory::Study, 120, Some(today.clone())).unwrap();
+        let task1 = svc.create_task("u1", "W1".into(), "".into(), TaskCategory::Work, 60, Some(today.clone()), RecurrenceKind::None).unwrap();
+        let task2 = svc.create_task("u1", "S1".into(), "".into(), TaskCategory::Study, 120, Some(today.clone()), RecurrenceKind::None).unwrap();
 
         // Directly update tasks to Completed with actual_minutes via SQL
         // (complete_task checks is_historical, which won't block today)
@@ -939,7 +940,7 @@ mod tests {
         let day_after = (chrono::Local::now() + chrono::Duration::days(2)).format("%Y-%m-%d").to_string();
 
         // Template created today (not historical)
-        let tpl = svc.create_task("u1", "Template".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        let tpl = svc.create_task("u1", "Template".into(), "".into(), TaskCategory::Work, 60, Some(today.clone()), RecurrenceKind::None).unwrap();
         svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
 
         // Today: real task (date==today), no virtual needed
@@ -964,7 +965,7 @@ mod tests {
     fn virtual_id_noop_on_delete() {
         let (_db, svc) = setup();
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone()), RecurrenceKind::None).unwrap();
         svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
 
         let virtual_id = format!("daily:{}:{}", tpl.id, today);
@@ -980,7 +981,7 @@ mod tests {
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
         let tomorrow = (chrono::Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
 
-        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone()), RecurrenceKind::None).unwrap();
         svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
 
         // materialize into tomorrow
@@ -999,7 +1000,7 @@ mod tests {
     fn virtual_id_blocked_on_start_task() {
         let (_db, svc) = setup();
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone()), RecurrenceKind::None).unwrap();
         svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
 
         let virtual_id = format!("daily:{}:{}", tpl.id, today);
@@ -1014,7 +1015,7 @@ mod tests {
     fn materialization_idempotent() {
         let (_db, svc) = setup();
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone()), RecurrenceKind::None).unwrap();
         svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
 
         let virtual_id = format!("daily:{}:{}", tpl.id, today);
@@ -1033,7 +1034,7 @@ mod tests {
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
         let tomorrow = (chrono::Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
 
-        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone()), RecurrenceKind::None).unwrap();
         svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
 
         let r = svc.start_task(&format!("daily:{}:{}", tpl.id, tomorrow)).unwrap();
@@ -1049,7 +1050,7 @@ mod tests {
     fn task_sessions_never_reference_virtual_id() {
         let (db, svc) = setup();
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone()), RecurrenceKind::None).unwrap();
         svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
 
         let virtual_id = format!("daily:{}:{}", tpl.id, today);
@@ -1067,7 +1068,7 @@ mod tests {
     fn complete_task_applies_bonus_faith() {
         let (_db, svc) = setup();
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let task = svc.create_task("u1", "Work".into(), "".into(), TaskCategory::Work, 60, Some(today)).unwrap();
+        let task = svc.create_task("u1", "Work".into(), "".into(), TaskCategory::Work, 60, Some(today), RecurrenceKind::None).unwrap();
 
         let result = svc.complete_task(&task.id, 120).unwrap();
         assert_eq!(result.bonus_faith, 10); // 120min = 2h × 5
@@ -1078,7 +1079,7 @@ mod tests {
     fn complete_task_study_applies_bonus() {
         let (_db, svc) = setup();
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let task = svc.create_task("u1", "Study".into(), "".into(), TaskCategory::Study, 60, Some(today)).unwrap();
+        let task = svc.create_task("u1", "Study".into(), "".into(), TaskCategory::Study, 60, Some(today), RecurrenceKind::None).unwrap();
 
         let result = svc.complete_task(&task.id, 60).unwrap();
         assert_eq!(result.bonus_faith, 5);

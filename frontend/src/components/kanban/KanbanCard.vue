@@ -7,6 +7,7 @@ import { useKanbanStore } from '@/stores/kanban';
 
 const props = defineProps<{
   task: Task;
+  columnId?: string; // pass the column this card lives in
   readonly?: boolean;
   processBinding?: ProcessBinding;
   isProcessRunning?: boolean;
@@ -36,7 +37,7 @@ const categoryLabel = computed(() => {
   return '其他';
 });
 
-const isActive = computed(() => props.task.status === ('active' as TaskStatus));
+const isActive = computed(() => props.task.status === ('running' as TaskStatus));
 
 function formatMinutes(min: number): string {
   if (min < 60) return `${min}min`;
@@ -162,7 +163,9 @@ onUnmounted(() => {
         <button class="action-btn edit" @click="emit('edit', task)">编辑</button>
       </template>
       <template v-else>
-        <button class="action-btn start" @click="emit('start', task)">开始</button>
+        <button class="action-btn start" @click="emit('start', task)">
+          {{ props.columnId === 'paused' ? '继续' : '开始' }}
+        </button>
       </template>
       <button class="action-btn delete" @click="emit('delete', task)">删除</button>
     </div>
