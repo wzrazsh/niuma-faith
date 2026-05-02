@@ -9,18 +9,13 @@ use crate::domain::{
     calc_survival, calc_progress,
     calc_task_bonus,
     DailyRecord, DailyStats, DisciplineInput,
-    Task, TaskCompleteResult, TaskStatus, TaskCategory,
+    RecurrenceKind, Task, TaskCompleteResult, TaskStatus, TaskCategory,
 };
 
 /// Task management service — orchestrates domain logic and persistence.
 pub struct TaskService {
     db: Arc<SqliteDb>,
     ledger: Arc<FaithLedgerService>,
-}
-
-/// US-002: Returns true if the given date string equals today (local time).
-fn is_today(date: &str) -> bool {
-    date == chrono::Local::now().format("%Y-%m-%d").to_string()
 }
 
 /// US-002: Returns true if the given date string is in the past (local time).
@@ -65,6 +60,8 @@ impl TaskService {
             duration_seconds: 0,
             ai_summary: None,
             updated_at: now_ts,
+            recurrence_kind: RecurrenceKind::None,
+            template_id: None,
         };
         TaskRepo::create(&*self.db, &task)?;
         Ok(task)
@@ -81,17 +78,47 @@ impl TaskService {
     }
 
     /// Get tasks for a user on a specific date (YYYY-MM-DD), optionally filtered by status.
+    /// Synthesizes virtual instances for active daily-recurrence templates that have not yet
+    /// been materialized for that date. Past dates only return real persisted rows.
     pub fn get_tasks_by_date(
         &self,
         user_id: &str,
         date: &str,
         status: Option<TaskStatus>,
     ) -> Result<Vec<Task>, RepoError> {
-        let tasks = TaskRepo::get_by_user(&*self.db, user_id, status)?;
-        Ok(tasks.into_iter().filter(|t| t.date == date).collect())
+        let mut tasks: Vec<Task> = TaskRepo::get_by_user(&*self.db, user_id, status)?
+            .into_iter()
+            .filter(|t| t.date == date)
+            .collect();
+
+        if is_historical(date) {
+            return Ok(tasks);
+        }
+
+        if let Some(s) = status {
+            if s != TaskStatus::Paused {
+                return Ok(tasks);
+            }
+        }
+
+        let templates = TaskRepo::get_active_templates(&*self.db, user_id, date)?;
+        for tpl in templates {
+            if tpl.date == date {
+                continue;
+            }
+            let existing_dates = TaskRepo::get_instance_dates_for_template(&*self.db, &tpl.id)?;
+            if existing_dates.iter().any(|d| d == date) {
+                continue;
+            }
+            tasks.push(synthesize_virtual_instance(&tpl, date));
+        }
+
+        Ok(tasks)
     }
 
     pub fn start_task(&self, id: &str) -> Result<Task, RepoError> {
+        let real_id = self.materialize_if_virtual(id)?;
+        let id = real_id.as_str();
         let task = TaskRepo::get(&*self.db, id)?
             .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
         match task.status {
@@ -120,6 +147,8 @@ impl TaskService {
             duration_seconds: task.duration_seconds,
             ai_summary: task.ai_summary,
             updated_at: now_ts.clone(),
+            recurrence_kind: task.recurrence_kind,
+            template_id: task.template_id,
         };
         TaskRepo::update(&*self.db, &updated)?;
         TaskSessionRepo::start_session(&*self.db, id, &now_ts)?;
@@ -127,6 +156,8 @@ impl TaskService {
     }
 
     pub fn pause_task(&self, id: &str) -> Result<Task, RepoError> {
+        let real_id = self.materialize_if_virtual(id)?;
+        let id = real_id.as_str();
         let task = TaskRepo::get(&*self.db, id)?
             .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
         if task.status != TaskStatus::Running {
@@ -160,12 +191,16 @@ impl TaskService {
             duration_seconds,
             ai_summary: task.ai_summary,
             updated_at: now_ts,
+            recurrence_kind: task.recurrence_kind,
+            template_id: task.template_id,
         };
         TaskRepo::update(&*self.db, &updated)?;
         Ok(updated)
     }
 
     pub fn resume_task(&self, id: &str) -> Result<Task, RepoError> {
+        let real_id = self.materialize_if_virtual(id)?;
+        let id = real_id.as_str();
         let task = TaskRepo::get(&*self.db, id)?
             .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
         match task.status {
@@ -192,6 +227,8 @@ impl TaskService {
             duration_seconds: task.duration_seconds,
             ai_summary: task.ai_summary,
             updated_at: now_ts.clone(),
+            recurrence_kind: task.recurrence_kind,
+            template_id: task.template_id,
         };
         TaskRepo::update(&*self.db, &updated)?;
         TaskSessionRepo::start_session(&*self.db, id, &now_ts)?;
@@ -199,6 +236,8 @@ impl TaskService {
     }
 
     pub fn end_task(&self, id: &str) -> Result<Task, RepoError> {
+        let real_id = self.materialize_if_virtual(id)?;
+        let id = real_id.as_str();
         let task = TaskRepo::get(&*self.db, id)?
             .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
         if matches!(task.status, TaskStatus::Completed | TaskStatus::Abandoned) {
@@ -235,6 +274,8 @@ impl TaskService {
             duration_seconds,
             ai_summary: task.ai_summary,
             updated_at: now_ts,
+            recurrence_kind: task.recurrence_kind,
+            template_id: task.template_id,
         };
         TaskRepo::update(&*self.db, &updated)?;
         Ok(updated)
@@ -251,6 +292,8 @@ impl TaskService {
         notes: Option<String>,
         status: Option<TaskStatus>,
     ) -> Result<Task, RepoError> {
+        let real_id = self.materialize_if_virtual(id)?;
+        let id = real_id.as_str();
         let task = TaskRepo::get(&*self.db, id)?
             .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
 
@@ -276,6 +319,8 @@ impl TaskService {
             duration_seconds: task.duration_seconds,
             ai_summary: task.ai_summary,
             updated_at: chrono::Local::now().to_rfc3339(),
+            recurrence_kind: task.recurrence_kind,
+            template_id: task.template_id,
         };
         TaskRepo::update(&*self.db, &updated)?;
         Ok(updated)
@@ -288,6 +333,8 @@ impl TaskService {
         id: &str,
         actual_minutes: i32,
     ) -> Result<TaskCompleteResult, RepoError> {
+        let real_id = self.materialize_if_virtual(id)?;
+        let id = real_id.as_str();
         let task = TaskRepo::get(&*self.db, id)?
             .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
 
@@ -319,15 +366,14 @@ impl TaskService {
             duration_seconds: task.duration_seconds,
             ai_summary: task.ai_summary,
             updated_at: now_ts,
+            recurrence_kind: task.recurrence_kind,
+            template_id: task.template_id,
         };
         TaskRepo::update(&*self.db, &completed)?;
 
-        // Recalculate daily faith from all completed tasks of the day
-        // TODO: Implement rebuild_daily_record
-        // self.rebuild_daily_record(&user_id, &date)?;
-
-        // Calculate bonus for returning to frontend
+        // US-010: Apply bonus faith to daily record + cumulative
         let bonus = calc_task_bonus(completed.category, actual_minutes);
+        self.apply_task_bonus(&user_id, &date, completed.category, bonus)?;
         let bonus_category = completed.category;
 
         Ok(TaskCompleteResult {
@@ -339,6 +385,8 @@ impl TaskService {
 
     /// Abandon a task (mark as abandoned, no bonus).
     pub fn abandon_task(&self, id: &str) -> Result<Task, RepoError> {
+        let real_id = self.materialize_if_virtual(id)?;
+        let id = real_id.as_str();
         let task = TaskRepo::get(&*self.db, id)?
             .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
 
@@ -364,21 +412,122 @@ impl TaskService {
             duration_seconds: task.duration_seconds,
             ai_summary: task.ai_summary,
             updated_at: chrono::Local::now().to_rfc3339(),
+            recurrence_kind: task.recurrence_kind,
+            template_id: task.template_id,
         };
         TaskRepo::update(&*self.db, &updated)?;
         Ok(updated)
     }
 
     /// Delete a task permanently.
+    /// Virtual ids (`daily:{template_id}:{date}`) are a no-op since nothing was ever persisted.
+    /// Templates cascade-delete all materialized instances.
     pub fn delete_task(&self, id: &str) -> Result<bool, RepoError> {
+        // Virtual id: nothing to delete
+        if id.starts_with("daily:") {
+            return Ok(true);
+        }
+
         // US-002: prevent deleting historical tasks
         let task = TaskRepo::get(&*self.db, id)?
             .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
         if is_historical(&task.date) {
             return Err(RepoError::HistoricalEditNotAllowed(task.date.clone()));
         }
+
+        // Daily-recurrence template: cascade
+        if task.recurrence_kind == RecurrenceKind::Daily && task.template_id.is_none() {
+            let removed = TaskRepo::delete_template_cascade(&*self.db, id)?;
+            tracing::info!(template = %id, removed_rows = removed, "daily.recurrence.template.cascade_deleted");
+            return Ok(removed > 0);
+        }
+
         TaskRepo::delete(&*self.db, id)?;
         Ok(true)
+    }
+
+    /// US-007: Toggle a task's recurrence kind. Only regular tasks (template_id=None)
+    /// may be promoted to/from a daily template; materialized instances reject the change.
+    pub fn set_task_recurrence(&self, id: &str, kind: RecurrenceKind) -> Result<Task, RepoError> {
+        // Virtual ids cannot be promoted: there is no persisted row to flip.
+        if id.starts_with("daily:") {
+            return Err(RepoError::InvalidStateTransition(
+                "cannot set recurrence on a virtual instance; mutate it first to materialize".into(),
+            ));
+        }
+
+        let task = TaskRepo::get(&*self.db, id)?
+            .ok_or_else(|| RepoError::TaskNotFound(id.to_string()))?;
+
+        if is_historical(&task.date) {
+            return Err(RepoError::HistoricalEditNotAllowed(task.date.clone()));
+        }
+
+        // Materialized instance: refuse to convert into a template — instances are
+        // owned by their parent template and have stale provenance fields.
+        if task.template_id.is_some() {
+            return Err(RepoError::InvalidStateTransition(
+                "cannot promote a materialized instance to a template".into(),
+            ));
+        }
+
+        if task.recurrence_kind == kind {
+            return Ok(task);
+        }
+
+        let updated = Task {
+            recurrence_kind: kind,
+            updated_at: chrono::Local::now().to_rfc3339(),
+            ..task
+        };
+        TaskRepo::update(&*self.db, &updated)?;
+        tracing::info!(task = %id, kind = ?kind, "daily.recurrence.set");
+        Ok(updated)
+    }
+
+    /// Materialize a virtual instance into a real persisted row, returning the real id.
+    /// Real ids are returned untouched. Idempotent: a second call resolves to the
+    /// already-materialized row via `find_instance`.
+    fn materialize_if_virtual(&self, id: &str) -> Result<String, RepoError> {
+        let Some(rest) = id.strip_prefix("daily:") else {
+            return Ok(id.to_string());
+        };
+
+        let mut parts = rest.splitn(2, ':');
+        let template_id = parts.next().ok_or_else(|| {
+            RepoError::InvalidStateTransition(format!("malformed virtual id: {}", id))
+        })?;
+        let date = parts.next().ok_or_else(|| {
+            RepoError::InvalidStateTransition(format!("malformed virtual id: {}", id))
+        })?;
+
+        if let Some(existing) = TaskRepo::find_instance(&*self.db, template_id, date)? {
+            return Ok(existing.id);
+        }
+
+        if is_historical(date) {
+            return Err(RepoError::HistoricalEditNotAllowed(date.to_string()));
+        }
+
+        let tpl = TaskRepo::get(&*self.db, template_id)?
+            .ok_or_else(|| RepoError::TaskNotFound(template_id.to_string()))?;
+        if tpl.recurrence_kind != RecurrenceKind::Daily {
+            return Err(RepoError::InvalidStateTransition(format!(
+                "task {} is not a daily-recurring template",
+                template_id
+            )));
+        }
+
+        let now_ts = chrono::Utc::now().to_rfc3339();
+        let real = build_instance_from_template(&tpl, date, &now_ts);
+        TaskRepo::create(&*self.db, &real)?;
+        tracing::info!(
+            template = %template_id,
+            date = %date,
+            instance = %real.id,
+            "daily.recurrence.materialized"
+        );
+        Ok(real.id)
     }
 
     /// Get daily statistics by aggregating tasks for a given date.
@@ -486,7 +635,7 @@ impl TaskService {
         let existing: Option<DailyRecord> = DailyRecordRepo::get(&*self.db, user_id, date)?;
 
         // Use zero faith if no record yet
-        let (base_survival, base_progress, base_discipline) = existing
+        let (base_survival, base_progress, _base_discipline) = existing
             .as_ref()
             .map(|r| (r.survival_faith, r.progress_faith, r.discipline_faith))
             .unwrap_or((0, 0, 0));
@@ -779,6 +928,161 @@ mod tests {
         assert_eq!(stats.survival_faith, 100);
         assert_eq!(stats.progress_faith, 200);
     }
+
+    // --- US-004 / US-005: daily recurrence ---
+
+    #[test]
+    fn get_tasks_by_date_excludes_past_templates() {
+        let (_db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let tomorrow = (chrono::Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+        let day_after = (chrono::Local::now() + chrono::Duration::days(2)).format("%Y-%m-%d").to_string();
+
+        // Template created today (not historical)
+        let tpl = svc.create_task("u1", "Template".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
+
+        // Today: real task (date==today), no virtual needed
+        let today_tasks = svc.get_tasks_by_date("u1", &today, Some(TaskStatus::Paused)).unwrap();
+        assert_eq!(today_tasks.len(), 1);
+        assert_eq!(today_tasks[0].id, tpl.id); // real task, not virtual
+
+        // Tomorrow: virtual instance appears
+        let future_tasks = svc.get_tasks_by_date("u1", &tomorrow, Some(TaskStatus::Paused)).unwrap();
+        assert_eq!(future_tasks.len(), 1);
+        assert!(future_tasks[0].id.starts_with("daily:"));
+        assert_eq!(future_tasks[0].template_id, Some(tpl.id.clone()));
+        assert_eq!(future_tasks[0].recurrence_kind, RecurrenceKind::None); // instance is not template
+
+        // Day after: another virtual
+        let future_tasks2 = svc.get_tasks_by_date("u1", &day_after, Some(TaskStatus::Paused)).unwrap();
+        assert_eq!(future_tasks2.len(), 1);
+        assert!(future_tasks2[0].id.starts_with("daily:"));
+    }
+
+    #[test]
+    fn virtual_id_noop_on_delete() {
+        let (_db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
+
+        let virtual_id = format!("daily:{}:{}", tpl.id, today);
+        let result = svc.delete_task(&virtual_id).unwrap();
+        assert!(result); // no-op succeeds
+        // template still exists
+        assert!(svc.get_task(&tpl.id).unwrap().is_some());
+    }
+
+    #[test]
+    fn template_cascade_delete() {
+        let (db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let tomorrow = (chrono::Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+
+        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
+
+        // materialize into tomorrow
+        svc.start_task(&format!("daily:{}:{}", tpl.id, tomorrow)).unwrap();
+        // pause to materialize
+        let instances = TaskRepo::get_by_user(&*db, "u1", None).unwrap();
+        let instance_id = instances.iter().find(|t| t.date == tomorrow).map(|t| t.id.clone()).unwrap();
+
+        let result = svc.delete_task(&tpl.id).unwrap();
+        assert!(result);
+        assert!(svc.get_task(&tpl.id).unwrap().is_none());
+        assert!(svc.get_task(&instance_id).unwrap().is_none());
+    }
+
+    #[test]
+    fn virtual_id_blocked_on_start_task() {
+        let (_db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
+
+        let virtual_id = format!("daily:{}:{}", tpl.id, today);
+        let result = svc.start_task(&virtual_id);
+        assert!(result.is_ok()); // materialize then start
+        let task = result.unwrap();
+        assert!(!task.id.starts_with("daily:")); // real id after materialize
+        assert_eq!(task.status, TaskStatus::Running);
+    }
+
+    #[test]
+    fn materialization_idempotent() {
+        let (_db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
+
+        let virtual_id = format!("daily:{}:{}", tpl.id, today);
+
+        // First call: materializes
+        let r1 = svc.start_task(&virtual_id).unwrap();
+        // Second call: should find existing
+        let r2 = svc.pause_task(&r1.id).unwrap();
+        assert_eq!(r2.id, r1.id); // same real id
+        assert_eq!(r2.status, TaskStatus::Paused);
+    }
+
+    #[test]
+    fn instance_cannot_be_promoted_to_template() {
+        let (_db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let tomorrow = (chrono::Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+
+        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
+
+        let r = svc.start_task(&format!("daily:{}:{}", tpl.id, tomorrow)).unwrap();
+        let result = svc.set_task_recurrence(&r.id, RecurrenceKind::Daily);
+        assert!(result.is_err()); // materialized instances can't be promoted
+        match result {
+            Err(RepoError::InvalidStateTransition(_)) => {}
+            other => panic!("Expected InvalidStateTransition, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn task_sessions_never_reference_virtual_id() {
+        let (db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let tpl = svc.create_task("u1", "T".into(), "".into(), TaskCategory::Work, 60, Some(today.clone())).unwrap();
+        svc.set_task_recurrence(&tpl.id, RecurrenceKind::Daily).unwrap();
+
+        let virtual_id = format!("daily:{}:{}", tpl.id, today);
+        svc.start_task(&virtual_id).unwrap();
+
+        // All task_sessions rows must reference a real (non-daily:) id
+        let all_tasks = TaskRepo::get_by_user(&*db, "u1", None).unwrap();
+        for t in all_tasks {
+            assert!(!t.id.starts_with("daily:"),
+                "task_sessions must never reference virtual id: {}", t.id);
+        }
+    }
+
+    #[test]
+    fn complete_task_applies_bonus_faith() {
+        let (_db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let task = svc.create_task("u1", "Work".into(), "".into(), TaskCategory::Work, 60, Some(today)).unwrap();
+
+        let result = svc.complete_task(&task.id, 120).unwrap();
+        assert_eq!(result.bonus_faith, 10); // 120min = 2h × 5
+        assert_eq!(result.bonus_category, TaskCategory::Work);
+    }
+
+    #[test]
+    fn complete_task_study_applies_bonus() {
+        let (_db, svc) = setup();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let task = svc.create_task("u1", "Study".into(), "".into(), TaskCategory::Study, 60, Some(today)).unwrap();
+
+        let result = svc.complete_task(&task.id, 60).unwrap();
+        assert_eq!(result.bonus_faith, 5);
+    }
 }
 
 /// Generate a simple UUID-like string using system time + a static counter.
@@ -792,4 +1096,54 @@ fn uuid_simple() -> String {
     let micros = now.as_micros();
     let count = COUNTER.fetch_add(1, Ordering::Relaxed);
     format!("{:x}-{:x}", micros, count)
+}
+
+/// Build a virtual instance Task projecting `template` onto `date`.
+/// Virtual instances are NEVER persisted by `get_tasks_by_date` — they exist only in memory
+/// until the user mutates them, at which point `materialize_if_virtual_within_conn` writes a real row.
+fn synthesize_virtual_instance(template: &Task, date: &str) -> Task {
+    Task {
+        id: format!("daily:{}:{}", template.id, date),
+        user_id: template.user_id.clone(),
+        date: date.to_string(),
+        title: template.title.clone(),
+        description: template.description.clone(),
+        category: template.category,
+        estimated_minutes: template.estimated_minutes,
+        actual_minutes: 0,
+        status: TaskStatus::Paused,
+        notes: String::new(),
+        created_at: template.created_at.clone(),
+        started_at: None,
+        completed_at: None,
+        duration_seconds: 0,
+        ai_summary: None,
+        updated_at: template.updated_at.clone(),
+        recurrence_kind: RecurrenceKind::None,
+        template_id: Some(template.id.clone()),
+    }
+}
+
+/// Build a real materialized Task from a template, ready for INSERT.
+fn build_instance_from_template(template: &Task, date: &str, now_ts: &str) -> Task {
+    Task {
+        id: uuid_simple(),
+        user_id: template.user_id.clone(),
+        date: date.to_string(),
+        title: template.title.clone(),
+        description: template.description.clone(),
+        category: template.category,
+        estimated_minutes: template.estimated_minutes,
+        actual_minutes: 0,
+        status: TaskStatus::Paused,
+        notes: String::new(),
+        created_at: now_ts.to_string(),
+        started_at: None,
+        completed_at: None,
+        duration_seconds: 0,
+        ai_summary: None,
+        updated_at: now_ts.to_string(),
+        recurrence_kind: RecurrenceKind::None,
+        template_id: Some(template.id.clone()),
+    }
 }

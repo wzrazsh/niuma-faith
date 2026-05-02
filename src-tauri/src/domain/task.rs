@@ -22,6 +22,36 @@ pub enum TaskStatus {
     Abandoned,
 }
 
+/// Recurrence policy. `Daily` rows act as templates synthesizing virtual instances per future day.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum RecurrenceKind {
+    #[default]
+    None,
+    Daily,
+}
+
+impl RecurrenceKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RecurrenceKind::None => "none",
+            RecurrenceKind::Daily => "daily",
+        }
+    }
+}
+
+impl TryFrom<&str> for RecurrenceKind {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "none" => Ok(RecurrenceKind::None),
+            "daily" => Ok(RecurrenceKind::Daily),
+            other => Err(format!("unknown recurrence_kind: {}", other)),
+        }
+    }
+}
+
 /// A named task item — not tied to a specific date, can span multiple days.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {
@@ -41,6 +71,10 @@ pub struct Task {
     pub duration_seconds: i64,
     pub ai_summary: Option<String>,
     pub updated_at: String,
+    #[serde(default)]
+    pub recurrence_kind: RecurrenceKind,
+    #[serde(default)]
+    pub template_id: Option<String>,
 }
 
 /// Daily statistics including task bonus breakdown.

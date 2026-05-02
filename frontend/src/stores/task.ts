@@ -14,6 +14,7 @@ import {
   invoke_abandon_task,
   invoke_delete_task,
   invoke_get_daily_stats,
+  invoke_set_task_recurrence,
 } from "@/api/task";
 
 function todayString(): string {
@@ -59,12 +60,13 @@ export const useTaskStore = defineStore("task", () => {
     description: string,
     category: TaskCategory,
     estimated_minutes: number,
-    date?: string
+    date?: string,
+    recurrenceKind?: 'none' | 'daily'
   ) {
     try {
       isLoading.value = true;
       error.value = null;
-      const task = await invoke_create_task(title, description, category, estimated_minutes, date ?? selectedDate.value);
+      const task = await invoke_create_task(title, description, category, estimated_minutes, date ?? selectedDate.value, recurrenceKind);
       tasks.value.push(task);
       return task;
     } catch (e) {
@@ -153,6 +155,19 @@ export const useTaskStore = defineStore("task", () => {
       const faithStore = useFaithStore();
       await faithStore.fetchTodayRecord();
       return updated;
+    } catch (e) {
+      error.value = String(e);
+      throw e;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function setTaskRecurrence(id: string, kind: 'none' | 'daily') {
+    try {
+      isLoading.value = true;
+      error.value = null;
+      await invoke_set_task_recurrence(id, kind);
     } catch (e) {
       error.value = String(e);
       throw e;
@@ -259,6 +274,7 @@ export const useTaskStore = defineStore("task", () => {
     updateTask,
     abandonTask,
     deleteTask,
+    setTaskRecurrence,
     fetchDailyStats,
     setFilter,
     setSelectedDate,

@@ -20,6 +20,9 @@ pub enum RepoError {
 
     #[error("HistoricalEditNotAllowed: cannot edit task on past date {0}")]
     HistoricalEditNotAllowed(String),
+
+    #[error("invalid task state transition: {0}")]
+    InvalidStateTransition(String),
 }
 
 /// Repository for user entities.
@@ -47,6 +50,24 @@ pub trait TaskRepo: Send + Sync {
     fn get_by_user(&self, user_id: &str, status: Option<TaskStatus>) -> Result<Vec<Task>, RepoError>;
     fn update(&self, task: &Task) -> Result<(), RepoError>;
     fn delete(&self, id: &str) -> Result<(), RepoError>;
+
+    /// Active recurring templates created on or before the given date.
+    /// Excludes templates whose `date` (creation day) is after `on_or_before_date`.
+    fn get_active_templates(
+        &self,
+        user_id: &str,
+        on_or_before_date: &str,
+    ) -> Result<Vec<Task>, RepoError>;
+
+    /// Dates (YYYY-MM-DD) for which a real materialized instance of `template_id` exists.
+    fn get_instance_dates_for_template(&self, template_id: &str) -> Result<Vec<String>, RepoError>;
+
+    /// Delete a template row plus all materialized instances pointing back to it.
+    /// Returns the total number of rows deleted.
+    fn delete_template_cascade(&self, template_id: &str) -> Result<usize, RepoError>;
+
+    /// Find the materialized instance for `(template_id, date)`, if any.
+    fn find_instance(&self, template_id: &str, date: &str) -> Result<Option<Task>, RepoError>;
 }
 
 pub trait FaithTransactionRepo: Send + Sync {

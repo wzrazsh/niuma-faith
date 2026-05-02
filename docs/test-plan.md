@@ -1,6 +1,6 @@
 # 牛马信仰 — 测试计划
 
-> 版本：2.0 | 更新日期：2026-05-01 | 测试范围：全栈
+> 版本：2.1 | 更新日期：2026-05-02 | 测试范围：全栈
 
 ---
 
@@ -8,8 +8,8 @@
 
 | 层次 | 框架 | 状态 | 覆盖范围 |
 |------|------|------|----------|
-| Rust 单元测试 | `#[cfg(test)]` in-module | ✅ 82 passed | domain / data / application / tauri |
-| 前端类型检查 | `vue-tsc --noEmit` | ⚠️ 15 项既有 TS 错误 | 类型安全 |
+| Rust 单元测试 | `#[cfg(test)]` in-module | ✅ 141 passed | domain / data / application / tauri |
+| 前端类型检查 | `vue-tsc --noEmit` | ✅ 0 errors | 类型安全 |
 | 前端构建 | `vite build` | ✅ 通过 | 模块打包 |
 | E2E 测试 | Playwright | 🔲 未配置 | 端到端 |
 | 集成测试 | Tauri test binary | ⚠️ Windows 需 WebView2 | IPC 调用链 |
@@ -17,15 +17,16 @@
 
 ---
 
-## 二、Rust 后端测试（当前 82 tests）
+## 二、Rust 后端测试（当前 141 tests）
 
 ### 2.1 Domain 层 — 纯函数单元测试
 
 | 模块 | 测试数 | 覆盖点 |
 |------|--------|--------|
-| `domain::faith` | 35 | `calc_survival` 9 档位边界；`calc_progress` 5 档位边界；`calc_discipline` 10 种组合；`calculate_daily` 7 种场景（空日/8h工作/8h+4h/满负载/边界） |
-| `domain::level` | 15 | `get_level` 各阈值/超界；`progress_to_next` 各级；`interval_to_next`；满级；全称号验证 |
+| `domain::faith` | 42 | `calc_survival` 9 档位边界；`calc_progress` 5 档位边界；`calc_discipline` 10 种组合；`calculate_daily` 7 种场景（空日/8h工作/8h+4h/满负载/边界） |
+| `domain::level` | 17 | `get_level` 各阈值/超界；`progress_to_next` 各级；`interval_to_next`；满级；全称号验证 |
 | `domain::task` | 9 | `calc_task_bonus` work/study/other 各分钟段（30/60/90/120min） |
+| `domain::models` | 2 | 模型结构序列化等 |
 
 **需补充的测试：**
 
@@ -34,7 +35,7 @@
 - [ ] `domain::level::LEVELS` — 确认 15 级 2.0 阈值全部 ×10 无误
 - [ ] `domain::models::ProcessInfo` — JSON 序列化/反序列化往返
 
-### 2.2 Data 层 — SQLite 持久化
+### 2.2 Data 层 — SQLite 持久化（共 15 项）
 
 | 测试 | 覆盖点 |
 |------|--------|
@@ -42,6 +43,7 @@
 | `upsert_daily_record_last_write_wins` | 同日多次写入取最新 |
 | `cross_day_separate_records` | 跨天记录隔离 |
 | `add_faith_updates_level` | 增加累计信仰触发等级更新 |
+| ……(其余 11 项见 `src-tauri/src/data/sqlite.rs::tests`) | armor 字段、faith_transactions、task_sessions 等 |
 
 **需补充的测试：**
 
@@ -51,49 +53,51 @@
 - [ ] 并发安全 — 多线程同时写入（Mutex 锁验证）
 - [ ] Schema 迁移 — `ensure_column` 对 `armr` 列的幂等性
 
-### 2.3 Application 层 — 业务逻辑
+### 2.3 Application 层 — 业务逻辑（共 29 项 = faith_service 9 + ledger_service 5 + task_service 15）
 
 | 测试 | 覆盖点 |
 |------|--------|
 | `upsert_daily_record_applies_delta` | 账本服务增量计算 |
 | `pause_task_accumulates_minutes_to_daily_record` | 暂停任务累计分钟到日记录 |
+| `check_in_*`(3 项) | 签到流程：无用户报错 / 新用户建档 / 同日重复覆盖 |
+| `build_status_*`(3 项) | FaithStatus 构建：含 armor 字段 / 零 armor / progress_to_next 正确 |
+| ……(其余 19 项分散于各 service) | 任务生命周期、信仰增量、跨天逻辑等 |
 
 **需补充的测试：**
 
-- [ ] `faith_service::check_in` — 完整签到流程（空用户 / 已有记录 / 跨天）
-- [ ] `faith_service::build_status` — FaithStatus 构建（armor 字段 / level 正确）
-- [ ] `task_service::complete_task` — 完成任务触发 bonus faith
-- [ ] `task_service::abandon_task` — 放弃任务不触发 bonus
-- [ ] `task_service::delete_task` — 删除后的级联清理
+- [x] `faith_service::check_in` — 完整签到流程（空用户 / 已有记录 / 跨天）
+- [x] `faith_service::build_status` — FaithStatus 构建（armor 字段 / level 正确）
+- [x] `task_service::complete_task` — 完成任务触发 bonus faith
+- [x] `task_service::abandon_task` — 放弃任务不触发 bonus
+- [x] `task_service::delete_task` — 删除后的级联清理
 - [ ] `task_service::is_historical` — 历史日期任务保护
 - [ ] `ledger_service::upsert_daily_record` — 重复 upsert 幂等；减少时为 0；负值保护
 
-### 2.4 Tauri 命令层
+### 2.4 Tauri 命令层（共 27 项）
 
 | 测试 | 覆盖点 |
 |------|--------|
 | `get_or_create_user` | 新建用户 |
 | `get_status_new_user` | 新用户状态查询 |
-| `create_task` | 正常创建 |
-| `create_task_invalid_category` | 非法分类拒绝 |
-| `create_task_zero_estimated_minutes` | 零预估时间拒绝 |
-| `start_task` | 开始任务 |
-| `pause_task` | 暂停任务 |
-| `resume_task` | 恢复任务 |
+| `create_task` / `create_task_invalid_category` / `create_task_zero_estimated_minutes` / `create_task_with_no_user` | 创建任务的正常 + 错误路径 |
+| `start_task` / `pause_task` / `resume_task` | 任务启停恢复 |
 | `task_lifecycle_workflow` | 完整生命周期 |
-| `is_process_running_returns_bool` | 进程存在性检查 |
-| `list_processes_returns_vec` | 进程列表返回 |
-| `list_processes_case_insensitive` | 大小写不敏感 |
-| `list_processes_no_match` | 无匹配进程 |
+| `complete_task_command` / `abandon_task_command` / `delete_task_command` | 完成 / 放弃 / 删除 |
+| `start_nonexistent_task` / `complete_nonexistent_task` / `abandon_nonexistent_task` / `delete_nonexistent_task` | 不存在任务的错误路径 |
+| `update_task_title` / `update_task_invalid_status` | 更新字段与非法 status |
+| `check_in_normal` / `check_in_duplicate_overwrites` | 签到 + 重复签到覆盖 |
+| `get_daily_stats_command` | 日统计 |
+| `is_process_running_returns_bool` / `is_process_running_non_windows` | 进程检查跨平台 |
+| `list_processes_returns_vec` / `list_processes_case_insensitive` / `list_processes_no_match` | 进程列表 |
 
 **需补充的测试：**
 
-- [ ] `check_in` 命令 — 正常签到 / 重复签到
-- [ ] `get_daily_stats` 命令 — 日统计
-- [ ] `update_task` — 更新标题/描述/预估时间
-- [ ] `complete_task` / `abandon_task` / `delete_task`
-- [ ] 所有命令的错误路径 — 无效参数 / 不存在的任务 / 不存在的用户
-- [ ] `is_process_running` — 非 Windows 平台错误处理
+- [x] `check_in` 命令 — 正常签到 / 重复签到
+- [x] `get_daily_stats` 命令 — 日统计
+- [x] `update_task` — 更新标题/描述/预估时间
+- [x] `complete_task` / `abandon_task` / `delete_task`
+- [x] 主要命令的错误路径 — 无效参数 / 不存在的任务 / 不存在的用户
+- [x] `is_process_running` — 非 Windows 平台错误处理
 
 ---
 
@@ -148,14 +152,9 @@
 | `process-detector.ts` | `isRunning` mock 返回 false；`listProcesses` mock 返回 []；`startPolling` 注册/清理 interval |
 | `reminder-service.ts` | 添加/移除提醒；未触发逻辑验证 |
 
-### 3.5 已知前端类型问题（不阻塞功能但需修复）
+### 3.5 前端类型问题（已清零）
 
-| 文件 | 问题 | 影响 |
-|------|------|------|
-| `mock-invoke.ts` | 6 处未使用变量 `args`、1 处未使用 `saveFaith` | 仅 TS 告警 |
-| `task.ts` | 4 处 `invoke` 未导入 | 该文件无法独立编译 |
-| `task.ts` | `activeTasks` 未使用 | 仅 TS 告警 |
-| `KanbanBoard.vue` / `KanbanCard.vue` | `'active'` vs `TaskStatus('running')` 类型不匹配 | 运行时实际传入 'active'，代码可运行 |
+`vue-tsc --noEmit` 当前 0 errors。历史的 4 类问题（mock-invoke 未使用变量、task.ts invoke 导入、activeTasks、KanbanBoard/Card 的 `'active'` 字面量）均已修复或显式 `as TaskStatus` 收编。后续如新增类型问题需在此节登记。
 
 ---
 
@@ -245,7 +244,7 @@ Day 2: 签到 → 完成 8h work + 8h study → 累计信仰 +1000
 
 ## 八、回归测试清单（每次发布前执行）
 
-- [ ] `cargo test` — 所有 82 项 Rust 测试通过
+- [ ] `cargo test` — 所有 141 项 Rust 测试通过
 - [ ] `npx vite build` — 前端构建成功
 - [ ] 手动启动 Tauri — 主窗口 + 悬浮窗 + 系统托盘正常
 - [ ] 创建 Work 任务 480min → 完成 → 验证生存信仰 = 400

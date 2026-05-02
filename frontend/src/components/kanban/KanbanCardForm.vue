@@ -24,6 +24,8 @@ const title = ref(props.task?.title ?? '');
 const description = ref(props.task?.description ?? '');
 const category = ref<TaskCategory>(props.task?.category ?? 'work');
 const estimatedHours = ref(props.task ? props.task.estimated_minutes / 60 : 1);
+const notes = ref(props.task?.notes ?? '');
+const isDaily = ref((props.task?.recurrence_kind ?? 'none') === 'daily');
 
 // 从看板列查找当前任务所在列
 function findTaskColumn(taskId: string): string {
@@ -71,6 +73,7 @@ onMounted(async () => {
       } catch { /* ignore parse errors */ }
     }
     selectedColumn.value = findTaskColumn(props.task.id);
+    isDaily.value = (props.task.recurrence_kind ?? 'none') === 'daily';
   }
 });
 
@@ -99,15 +102,18 @@ async function handleSubmit() {
         description.value.trim(),
         minutes,
         undefined,
-        undefined
+        notes.value.trim() || undefined
       );
+      await taskStore.setTaskRecurrence(props.task.id, isDaily.value ? 'daily' : 'none');
     } else {
       // 创建任务
       await taskStore.createTask(
         title.value.trim(),
         description.value.trim(),
         category.value,
-        minutes
+        minutes,
+        undefined,
+        isDaily.value ? 'daily' : 'none'
       );
     }
     
@@ -183,7 +189,19 @@ async function handleSubmit() {
           </option>
         </select>
       </div>
-      
+
+      <div class="form-group">
+        <label>
+          <input v-model="isDaily" type="checkbox" />
+          每日执行
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label>备注</label>
+        <textarea v-model="notes" placeholder="备注（可选）" rows="2" />
+      </div>
+
       <hr />
       
       <div class="form-group">

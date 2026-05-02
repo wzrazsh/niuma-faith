@@ -59,6 +59,8 @@ export interface FaithStatus {
 export type TaskCategory = 'work' | 'study' | 'other';
 export type TaskStatus = 'running' | 'paused' | 'completed' | 'abandoned';
 
+export type RecurrenceKind = 'none' | 'daily';
+
 export interface Task {
   id: string;
   user_id: string;
@@ -76,6 +78,8 @@ export interface Task {
   duration_seconds: number;
   ai_summary: string | null;
   updated_at: string;
+  recurrence_kind?: RecurrenceKind;
+  template_id?: string | null;
 }
 
 export interface TaskCompleteResult {

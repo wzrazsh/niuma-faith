@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { useTaskStore } from "@/stores/task";
+import { useKanbanStore } from "@/stores/kanban";
 import type { Task, TaskCategory } from "@/types";
 
 const props = defineProps<{
@@ -12,6 +13,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useTaskStore();
+const kanbanStore = useKanbanStore();
 
 const isEdit = ref(props.task !== null);
 const title = ref(props.task?.title ?? "");
@@ -19,16 +21,32 @@ const description = ref(props.task?.description ?? "");
 const category = ref<TaskCategory>(props.task?.category ?? "work");
 const estimatedHours = ref(props.task ? props.task.estimated_minutes / 60 : 1);
 const notes = ref(props.task?.notes ?? "");
+const isDaily = ref((props.task?.recurrence_kind ?? 'none') === 'daily');
 const isSubmitting = ref(false);
 const errorMsg = ref("");
 
-watch(() => props.task, (t) => {
+function findTaskColumn(taskId: string): string {
+  for (const col of kanbanStore.columns) {
+    if (col.taskIds.includes(taskId)) return col.id;
+  }
+  return 'todo';
+}
+const columnId = ref(findTaskColumn(props.task?.id ?? ''));
+
+watch(() => props.task, async (t) => {
   isEdit.value = t !== null;
   title.value = t?.title ?? "";
   description.value = t?.description ?? "";
   category.value = t?.category ?? "work";
   estimatedHours.value = t ? t.estimated_minutes / 60 : 1;
   notes.value = t?.notes ?? "";
+  isDaily.value = (t?.recurrence_kind ?? 'none') === 'daily';
+  if (t) {
+    if (kanbanStore.columns.length === 0) {
+      await kanbanStore.loadBoardConfig();
+    }
+    columnId.value = findTaskColumn(t.id);
+  }
 });
 
 async function handleSubmit() {
@@ -46,8 +64,19 @@ async function handleSubmit() {
     const minutes = Math.round(estimatedHours.value * 60);
     if (isEdit.value && props.task) {
       await store.updateTask(props.task.id, title.value.trim(), description.value.trim(), minutes, undefined, notes.value.trim() || undefined);
+      await store.setTaskRecurrence(props.task.id, isDaily.value ? 'daily' : 'none');
     } else {
-      await store.createTask(title.value.trim(), description.value.trim(), category.value, minutes);
+      const newTask = await store.createTask(title.value.trim(), description.value.trim(), category.value, minutes, undefined, isDaily.value ? 'daily' : 'none');
+      // 同步到看板：添加到指定列
+      if (newTask?.id && columnId.value) {
+        kanbanStore.addCardToColumn(newTask.id, columnId.value);
+        // 同步写入 kanban-card-{id} 配置
+        const key = `kanban-card-${newTask.id}`;
+        const stored = localStorage.getItem(key);
+        const card = stored ? JSON.parse(stored) : { task: { id: newTask.id }, columnId: columnId.value, orderInColumn: 0 };
+        card.columnId = columnId.value;
+        localStorage.setItem(key, JSON.stringify(card));
+      }
     }
     emit("close");
   } catch (e: any) {
@@ -92,9 +121,25 @@ async function handleSubmit() {
         </div>
       </div>
 
+      <div class="form-group">
+        <label class="form-label">所属列</label>
+        <select v-model="columnId" class="form-input">
+          <option v-for="col in kanbanStore.sortedColumns" :key="col.id" :value="col.id">
+            {{ col.title }}
+          </option>
+        </select>
+      </div>
+
       <div v-if="isEdit" class="form-group">
         <label class="form-label">备注</label>
         <textarea v-model="notes" class="form-input" placeholder="备注（可选）" rows="2"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label recurring-checkbox">
+          <input v-model="isDaily" type="checkbox" class="recurring-input" />
+          <span>每日执行</span>
+        </label>
       </div>
 
       <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
@@ -217,6 +262,21 @@ textarea.form-input {
   color: #1a1a24;
   font-weight: 600;
   cursor: pointer;
+}
+
+.recurring-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+}
+
+.recurring-input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary);
 }
 
 .submit-btn:disabled {

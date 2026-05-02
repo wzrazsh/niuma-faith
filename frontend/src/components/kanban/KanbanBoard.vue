@@ -3,7 +3,7 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useKanbanStore } from '@/stores/kanban';
 import { useTaskStore } from '@/stores/task';
-import type { Task, TaskStatus } from '@/types';
+import type { Task } from '@/types';
 import type { ProcessBinding, KanbanCard as KanbanCardType } from '@/types/kanban';
 import KanbanColumn from './KanbanColumn.vue';
 import KanbanCardForm from './KanbanCardForm.vue';
@@ -94,9 +94,9 @@ function startProcessPolling(taskId: string, binding: ProcessBinding) {
       const task = props.tasks.find((t) => t.id === taskId);
       if (!task) return;
 
-      if (running && binding.autoStart && task.status !== ("active" as TaskStatus)) {
+      if (running && binding.autoStart && task.status !== 'running') {
         handleCardStart(task);
-      } else if (!running && binding.autoPause && task.status === ("active" as TaskStatus)) {
+      } else if (!running && binding.autoPause && task.status === 'running') {
         handleCardPause(task);
       }
     }
@@ -167,17 +167,42 @@ function getColumnProcessBindings(columnId: string): Map<string, ProcessBinding 
 }
 
 function handleCardDrop(taskId: string, toColumnId: string, newOrder: number) {
-  const fromColumn = store.columns.find(col => 
-    col.taskIds.includes(taskId)
-  );
-  if (fromColumn) {
-    store.moveCard(taskId, fromColumn.id, toColumnId, newOrder);
+  const task = props.tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  const fromColumn = store.columns.find(col => col.taskIds.includes(taskId));
+
+  // 根据目标列更新任务状态，再移动视觉位置
+  switch (toColumnId) {
+    case 'doing':
+      taskStore.updateTask(taskId, undefined, undefined, undefined, undefined, undefined, 'running')
+        .then(() => store.moveToColumn(taskId, 'doing'));
+      break;
+    case 'paused':
+      taskStore.updateTask(taskId, undefined, undefined, undefined, undefined, undefined, 'paused')
+        .then(() => store.moveToColumn(taskId, 'paused'));
+      break;
+    case 'todo':
+      taskStore.updateTask(taskId, undefined, undefined, undefined, undefined, undefined, 'paused')
+        .then(() => store.moveToColumn(taskId, 'todo'));
+      break;
+    case 'done':
+      const elapsed = store.stopTimer(taskId);
+      const actualMinutes = task.actual_minutes + Math.ceil(elapsed / 60000);
+      taskStore.completeTask(taskId, actualMinutes)
+        .then(() => store.moveToColumn(taskId, 'done'));
+      break;
+    default:
+      // 自定义列或其他：只移动视觉位置
+      if (fromColumn) {
+        store.moveCard(taskId, fromColumn.id, toColumnId, newOrder);
+      }
   }
 }
 
 async function handleCardStart(task: Task) {
   try {
-    await taskStore.updateTask(task.id, undefined, undefined, undefined, undefined, undefined, 'active' as TaskStatus);
+    await taskStore.updateTask(task.id, undefined, undefined, undefined, undefined, undefined, 'running');
     store.moveToColumn(task.id, 'doing');
     store.startTimer(task.id);
     emit('refresh');

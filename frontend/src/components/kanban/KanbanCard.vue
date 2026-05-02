@@ -112,6 +112,7 @@ onUnmounted(() => {
   >
     <div class="card-header">
       <span class="card-title">{{ task.title }}</span>
+      <span v-if="(task.recurrence_kind ?? 'none') === 'daily' || task.template_id" class="recurring-badge">每日</span>
       <span class="card-category" :data-cat="task.category">{{ categoryLabel }}</span>
     </div>
     
@@ -211,6 +212,16 @@ onUnmounted(() => {
 .card-category[data-cat="work"] { background: var(--color-survival); color: #1a1a24; }
 .card-category[data-cat="study"] { background: var(--color-progress); color: #1a1a24; }
 .card-category[data-cat="other"] { background: var(--color-discipline); color: #1a1a24; }
+
+.recurring-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--color-primary);
+  color: #1a1a24;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
 
 .card-meta {
   font-size: 0.8125rem;

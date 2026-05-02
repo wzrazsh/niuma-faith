@@ -11,7 +11,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use niuma_faith_lib::{AppState, SqliteDb};
 use niuma_faith_lib::domain::{
-    DailyRecord, DailyStats, FaithStatus, ProcessInfo, Task, TaskCategory,
+    DailyRecord, DailyStats, FaithStatus, ProcessInfo, RecurrenceKind, Task, TaskCategory,
     TaskCompleteResult, TaskStatus, User,
 };
 
@@ -59,6 +59,7 @@ async fn create_task(
     category: String,
     estimated_minutes: i32,
     date: Option<String>,
+    recurrence_kind: Option<String>,
 ) -> Result<Task, String> {
     let cat = match category.as_str() {
         "work" => TaskCategory::Work,
@@ -69,10 +70,23 @@ async fn create_task(
     if estimated_minutes <= 0 {
         return Err("estimated_minutes must be > 0".into());
     }
-    state
+    let mut result = state
         .task_service
         .create_task(&user_id, title, description, cat, estimated_minutes, date)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    if let Some(kind_str) = recurrence_kind {
+        let kind = match kind_str.as_str() {
+            "daily" => RecurrenceKind::Daily,
+            "none" | _ => RecurrenceKind::None,
+        };
+        if kind != RecurrenceKind::None {
+            result = state
+                .task_service
+                .set_task_recurrence(&result.id, kind)
+                .map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(result)
 }
 
 /// 6. get_tasks_by_date — get tasks for a user on a specific date
@@ -216,7 +230,24 @@ async fn end_task(state: tauri::State<'_, AppState>, id: String) -> Result<Task,
         .map_err(|e| e.to_string())
 }
 
-/// 16. get_daily_stats — get daily stats with task bonus breakdown
+/// 16. set_task_recurrence — set/unset daily recurrence on a task
+#[tauri::command]
+async fn set_task_recurrence(
+    state: tauri::State<'_, AppState>,
+    id: String,
+    kind: String,
+) -> Result<Task, String> {
+    let kind = match kind.as_str() {
+        "daily" => RecurrenceKind::Daily,
+        "none" | _ => RecurrenceKind::None,
+    };
+    state
+        .task_service
+        .set_task_recurrence(&id, kind)
+        .map_err(|e| e.to_string())
+}
+
+/// 17. get_daily_stats — get daily stats with task bonus breakdown
 #[tauri::command]
 async fn get_daily_stats(
     state: tauri::State<'_, AppState>,
@@ -443,6 +474,7 @@ fn main() {
             pause_task,
             resume_task,
             end_task,
+            set_task_recurrence,
             get_daily_stats,
             open_floating_widget,
             close_floating_widget,

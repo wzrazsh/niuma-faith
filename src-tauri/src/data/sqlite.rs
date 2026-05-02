@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use crate::data::schema::init_schema;
 use crate::data::repository::{DailyRecordRepo, FaithTransactionRepo, RepoError, TaskRepo, TaskSessionRepo, UserRepo};
-use crate::domain::{DailyRecord, FaithTransaction, Task, TaskStatus, User};
+use crate::domain::{DailyRecord, FaithTransaction, RecurrenceKind, Task, TaskStatus, User};
 
 /// Shared SQLite connection pool wrapper.
 /// rusqlite Connection is not thread-safe; we use a Mutex (single writer).
@@ -214,8 +214,9 @@ impl TaskRepo for SqliteDb {
         self.with_conn(|conn| {
             conn.execute(
                 "INSERT INTO tasks (id, user_id, date, title, description, category, estimated_minutes,
-                         actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at)
-                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+                         actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at,
+                         recurrence_kind, template_id)
+                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
                 rusqlite::params![
                     task.id,
                     task.user_id,
@@ -233,6 +234,8 @@ impl TaskRepo for SqliteDb {
                     task.duration_seconds,
                     task.ai_summary,
                     task.updated_at,
+                    task.recurrence_kind.as_str(),
+                    task.template_id,
                 ],
             )?;
             Ok(())
@@ -243,7 +246,8 @@ impl TaskRepo for SqliteDb {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT id, user_id, date, title, description, category, estimated_minutes,
-                        actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at
+                        actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at,
+                        recurrence_kind, template_id
                  FROM tasks WHERE id = ?",
             )?;
             let mut rows = stmt.query([id])?;
@@ -262,7 +266,8 @@ impl TaskRepo for SqliteDb {
                     let status_str = serde_json::to_string(&s).unwrap();
                     let mut stmt = conn.prepare(
                         "SELECT id, user_id, date, title, description, category, estimated_minutes,
-                                actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at
+                                actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at,
+                                recurrence_kind, template_id
                          FROM tasks WHERE user_id = ? AND status = ?",
                     )?;
                     let mut rows = stmt.query([user_id, &status_str])?;
@@ -275,7 +280,8 @@ impl TaskRepo for SqliteDb {
                 None => {
                     let mut stmt = conn.prepare(
                         "SELECT id, user_id, date, title, description, category, estimated_minutes,
-                                actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at
+                                actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at,
+                                recurrence_kind, template_id
                          FROM tasks WHERE user_id = ?",
                     )?;
                     let mut rows = stmt.query([user_id])?;
@@ -294,7 +300,8 @@ impl TaskRepo for SqliteDb {
         self.with_conn(|conn| {
             conn.execute(
                 "UPDATE tasks SET title=?, description=?, category=?, estimated_minutes=?,
-                 actual_minutes=?, status=?, notes=?, started_at=?, completed_at=?, duration_seconds=?, ai_summary=?, updated_at=?
+                 actual_minutes=?, status=?, notes=?, started_at=?, completed_at=?, duration_seconds=?, ai_summary=?, updated_at=?,
+                 recurrence_kind=?, template_id=?
                  WHERE id=?",
                 rusqlite::params![
                     task.title,
@@ -309,6 +316,8 @@ impl TaskRepo for SqliteDb {
                     task.duration_seconds,
                     task.ai_summary,
                     task.updated_at,
+                    task.recurrence_kind.as_str(),
+                    task.template_id,
                     task.id,
                 ],
             )?;
@@ -320,6 +329,72 @@ impl TaskRepo for SqliteDb {
         self.with_conn(|conn| {
             conn.execute("DELETE FROM tasks WHERE id = ?", [id])?;
             Ok(())
+        })
+    }
+
+    fn get_active_templates(
+        &self,
+        user_id: &str,
+        on_or_before_date: &str,
+    ) -> Result<Vec<Task>, RepoError> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT id, user_id, date, title, description, category, estimated_minutes,
+                        actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at,
+                        recurrence_kind, template_id
+                 FROM tasks
+                 WHERE user_id = ?1
+                   AND recurrence_kind = 'daily'
+                   AND template_id IS NULL
+                   AND date <= ?2",
+            )?;
+            let mut rows = stmt.query([user_id, on_or_before_date])?;
+            let mut tasks = Vec::new();
+            while let Some(row) = rows.next()? {
+                tasks.push(row_to_task(row)?);
+            }
+            Ok(tasks)
+        })
+    }
+
+    fn get_instance_dates_for_template(&self, template_id: &str) -> Result<Vec<String>, RepoError> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT date FROM tasks WHERE template_id = ?",
+            )?;
+            let mut rows = stmt.query([template_id])?;
+            let mut dates = Vec::new();
+            while let Some(row) = rows.next()? {
+                dates.push(row.get(0)?);
+            }
+            Ok(dates)
+        })
+    }
+
+    fn delete_template_cascade(&self, template_id: &str) -> Result<usize, RepoError> {
+        self.with_conn(|conn| {
+            let count = conn.execute(
+                "DELETE FROM tasks WHERE id = ?1 OR template_id = ?1",
+                [template_id],
+            )?;
+            Ok(count)
+        })
+    }
+
+    fn find_instance(&self, template_id: &str, date: &str) -> Result<Option<Task>, RepoError> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT id, user_id, date, title, description, category, estimated_minutes,
+                        actual_minutes, status, notes, created_at, started_at, completed_at, duration_seconds, ai_summary, updated_at,
+                        recurrence_kind, template_id
+                 FROM tasks WHERE template_id = ?1 AND date = ?2",
+            )?;
+            let mut rows = stmt.query([template_id, date])?;
+            if let Some(row) = rows.next()? {
+                Ok(Some(row_to_task(row)?))
+            } else {
+                Ok(None)
+            }
         })
     }
 }
@@ -389,6 +464,7 @@ impl TaskSessionRepo for SqliteDb {
 /// Helper: convert a rusqlite row to a Task.
 fn row_to_task(row: &rusqlite::Row) -> Result<Task, RepoError> {
     let raw_status: String = row.get(8)?;
+    let raw_recurrence: String = row.get(16)?;
     Ok(Task {
         id: row.get(0)?,
         user_id: row.get(1)?,
@@ -408,6 +484,9 @@ fn row_to_task(row: &rusqlite::Row) -> Result<Task, RepoError> {
         duration_seconds: row.get(13)?,
         ai_summary: row.get(14)?,
         updated_at: row.get(15)?,
+        recurrence_kind: RecurrenceKind::try_from(raw_recurrence.as_str())
+            .map_err(RepoError::InvalidStateTransition)?,
+        template_id: row.get(17)?,
     })
 }
 
@@ -435,6 +514,34 @@ mod tests {
 
     fn default_discipline() -> DisciplineInput {
         DisciplineInput { break_count: 0, leave_record: 0, close_record: 1 }
+    }
+
+    /// Helper: create a task with the given fields, persisting to the db.
+    fn make_task(db: &SqliteDb, id: &str, title: &str, recurrence_kind: &str, date: &str) -> Task {
+        use crate::domain::RecurrenceKind;
+        let ts = "2026-05-01T00:00:00+08:00";
+        let task = Task {
+            id: id.into(),
+            user_id: "u1".into(),
+            date: date.into(),
+            title: title.into(),
+            description: String::new(),
+            category: crate::domain::TaskCategory::Work,
+            estimated_minutes: 60,
+            actual_minutes: 0,
+            status: crate::domain::TaskStatus::Paused,
+            notes: String::new(),
+            created_at: ts.into(),
+            started_at: None,
+            completed_at: None,
+            duration_seconds: 0,
+            ai_summary: None,
+            updated_at: ts.into(),
+            recurrence_kind: RecurrenceKind::try_from(recurrence_kind).unwrap(),
+            template_id: None,
+        };
+        TaskRepo::create(db, &task).unwrap();
+        task
     }
 
     #[test]
@@ -620,6 +727,112 @@ mod tests {
             assert_eq!(count, 3);
             Ok::<_, RepoError>(())
         }).unwrap();
+    }
+
+    // --- 6b. task recurrence (US-003, US-005) ---
+
+    #[test]
+    fn get_active_templates_returns_daily_templates_on_or_before_date() {
+        let db = fresh_db();
+        let ts = "2026-05-01T00:00:00+08:00";
+        // t1 on 2026-05-01 and t3 on 2026-05-01 pass; t2 on 2026-05-02 is excluded
+        let _templates = vec![
+            make_task(&db, "t1", "daily1", "daily", "2026-05-01"),
+            make_task(&db, "t2", "daily2", "daily", "2026-05-02"),
+            make_task(&db, "t3", "regular", "none", "2026-05-01"),
+        ];
+
+        let active = TaskRepo::get_active_templates(&db, "u1", "2026-05-01").unwrap();
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].id, "t1");
+
+        let active = TaskRepo::get_active_templates(&db, "u1", "2026-04-30").unwrap();
+        assert!(active.is_empty());
+    }
+
+    #[test]
+    fn get_instance_dates_for_template() {
+        let db = fresh_db();
+        let ts = "2026-05-01T00:00:00+08:00";
+        let _tpl = make_task(&db, "t1", "template", "daily", ts);
+        let _inst1 = make_task(&db, "inst1", "inst-0502", "none", "2026-05-02");
+        let _inst2 = make_task(&db, "inst2", "inst-0503", "none", "2026-05-03");
+
+        // Mark inst1 and inst2 as instances of tpl
+        db.with_conn(|conn| {
+            conn.execute(
+                "UPDATE tasks SET template_id = ? WHERE id = ?",
+                ["t1", "inst1"],
+            )?;
+            conn.execute(
+                "UPDATE tasks SET template_id = ? WHERE id = ?",
+                ["t1", "inst2"],
+            )?;
+            Ok::<_, RepoError>(())
+        }).unwrap();
+
+        let dates = TaskRepo::get_instance_dates_for_template(&db, "t1").unwrap();
+        assert_eq!(dates.len(), 2);
+        assert!(dates.contains(&"2026-05-02".into()));
+        assert!(dates.contains(&"2026-05-03".into()));
+    }
+
+    #[test]
+    fn find_instance_returns_materialized_instance() {
+        let db = fresh_db();
+        let ts = "2026-05-01T00:00:00+08:00";
+        let _tpl = make_task(&db, "t1", "template", "daily", ts);
+        let _inst = make_task(&db, "inst1", "inst-0502", "none", "2026-05-02");
+        db.with_conn(|conn| {
+            conn.execute(
+                "UPDATE tasks SET template_id = ? WHERE id = ?",
+                ["t1", "inst1"],
+            )?;
+            Ok::<_, RepoError>(())
+        }).unwrap();
+
+        let found = TaskRepo::find_instance(&db, "t1", "2026-05-02").unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, "inst1");
+
+        let not_found = TaskRepo::find_instance(&db, "t1", "2026-05-03").unwrap();
+        assert!(not_found.is_none());
+    }
+
+    #[test]
+    fn delete_template_cascade_removes_template_and_instances() {
+        let db = fresh_db();
+        let ts = "2026-05-01T00:00:00+08:00";
+        make_task(&db, "t1", "template", "daily", ts);
+        make_task(&db, "inst1", "inst-0502", "none", "2026-05-02");
+        make_task(&db, "inst2", "inst-0503", "none", "2026-05-03");
+
+        db.with_conn(|conn| {
+            conn.execute("UPDATE tasks SET template_id = ? WHERE id = ?", ["t1", "inst1"])?;
+            conn.execute("UPDATE tasks SET template_id = ? WHERE id = ?", ["t1", "inst2"])?;
+            Ok::<_, RepoError>(())
+        }).unwrap();
+
+        let removed = TaskRepo::delete_template_cascade(&db, "t1").unwrap();
+        assert_eq!(removed, 3);
+
+        assert!(TaskRepo::get(&db, "t1").unwrap().is_none());
+        assert!(TaskRepo::get(&db, "inst1").unwrap().is_none());
+        assert!(TaskRepo::get(&db, "inst2").unwrap().is_none());
+    }
+
+    #[test]
+    fn task_create_and_read_persists_recurrence_kind_and_template_id() {
+        let db = fresh_db();
+        let ts = "2026-05-01T00:00:00+08:00";
+        let tpl = make_task(&db, "t1", "daily-template", "daily", ts);
+
+        assert_eq!(tpl.recurrence_kind, RecurrenceKind::Daily);
+        assert!(tpl.template_id.is_none());
+
+        let loaded = TaskRepo::get(&db, "t1").unwrap().unwrap();
+        assert_eq!(loaded.recurrence_kind, RecurrenceKind::Daily);
+        assert!(loaded.template_id.is_none());
     }
 
     // --- 7. task_sessions lifecycle ---

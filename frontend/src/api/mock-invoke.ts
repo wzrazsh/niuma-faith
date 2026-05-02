@@ -1,7 +1,6 @@
 /**
- * Browser-mode mock for @tauri-apps/api/core invoke.
- * When running in `npm run dev` (not inside Tauri), uses localStorage with
- * the same interface as the Tauri backend commands.
+ * Dual-mode invoke: real Tauri IPC when inside the Tauri shell,
+ * localStorage mock when running in browser dev mode.
  */
 
 const STORAGE_TASKS = 'mock-tasks';
@@ -23,6 +22,14 @@ interface MockTask {
   updated_at: string;
   completed_at: string | null;
   started_at: string | null;
+  recurrence_kind?: RecurrenceKind;
+  template_id?: string | null;
+}
+
+export type RecurrenceKind = 'none' | 'daily';
+
+function isHistoricalDate(date: string): boolean {
+  return date < todayStr();
 }
 
 interface MockFaithRecord {
@@ -131,6 +138,8 @@ const handlers: Record<string, Function> = {
       updated_at: now,
       completed_at: null,
       started_at: null,
+      recurrence_kind: (args.recurrenceKind as RecurrenceKind) ?? 'none',
+      template_id: null,
     };
     tasks.push(task);
     saveTasks(tasks);
@@ -147,12 +156,43 @@ const handlers: Record<string, Function> = {
 
   get_tasks_by_date(args: any): MockTask[] {
     const tasks = loadTasks();
-    return tasks.filter(t => {
+    const date = args.date as string;
+    const real = tasks.filter(t => {
       if (t.user_id !== args.userId) return false;
-      if (t.date !== args.date) return false;
+      if (t.date !== date) return false;
       if (args.status && t.status !== args.status) return false;
       return true;
     });
+    if (isHistoricalDate(date)) return real;
+    if (args.status && args.status !== 'paused') return real;
+
+    const templates = tasks.filter(
+      t => t.user_id === args.userId && t.recurrence_kind === 'daily' && !t.template_id && t.date <= date,
+    );
+    const result = real.slice();
+    for (const tpl of templates) {
+      if (tpl.date === date) continue;
+      if (tasks.some(t => t.template_id === tpl.id && t.date === date)) continue;
+      result.push({
+        id: `daily:${tpl.id}:${date}`,
+        user_id: tpl.user_id,
+        title: tpl.title,
+        description: tpl.description,
+        category: tpl.category,
+        estimated_minutes: tpl.estimated_minutes,
+        actual_minutes: 0,
+        notes: '',
+        date,
+        status: 'paused',
+        created_at: tpl.created_at,
+        updated_at: tpl.updated_at,
+        completed_at: null,
+        started_at: null,
+        recurrence_kind: 'none',
+        template_id: tpl.id,
+      });
+    }
+    return result;
   },
 
   get_task(args: any): MockTask | null {
@@ -176,7 +216,8 @@ const handlers: Record<string, Function> = {
     return t;
   },
 
-  complete_task(args: any): { task: MockTask; faith_update: any } {
+  complete_task(args: any): { task: MockTask; bonus_faith: number; bonus_category: string } {
+    if (args.id?.startsWith('daily:')) throw new Error('cannot complete virtual task');
     const tasks = loadTasks();
     const idx = tasks.findIndex(t => t.id === args.id);
     if (idx === -1) throw new Error(`Task not found: ${args.id}`);
@@ -187,10 +228,13 @@ const handlers: Record<string, Function> = {
     t.completed_at = new Date().toISOString();
     tasks[idx] = t;
     saveTasks(tasks);
-    return { task: t, faith_update: {} };
+    const hours = Math.max(1, Math.floor((t.actual_minutes || 60) / 60));
+    const rate = t.category === 'other' ? 2 : 5;
+    return { task: t, bonus_faith: hours * rate, bonus_category: t.category };
   },
 
   abandon_task(args: any): MockTask {
+    if (args.id?.startsWith('daily:')) throw new Error('cannot abandon virtual task');
     const tasks = loadTasks();
     const idx = tasks.findIndex(t => t.id === args.id);
     if (idx === -1) throw new Error(`Task not found: ${args.id}`);
@@ -203,12 +247,36 @@ const handlers: Record<string, Function> = {
   },
 
   delete_task(args: any): boolean {
+    // Virtual id: nothing to delete
+    if (args.id?.startsWith('daily:')) return true;
     const tasks = loadTasks();
+    // Template cascade
+    const t = tasks.find(t => t.id === args.id);
+    if (t?.recurrence_kind === 'daily' && !t.template_id) {
+      const before = tasks.length;
+      const remaining = tasks.filter(t => t.id !== args.id && t.template_id !== args.id);
+      saveTasks(remaining);
+      return remaining.length < before;
+    }
     const idx = tasks.findIndex(t => t.id === args.id);
     if (idx === -1) return false;
     tasks.splice(idx, 1);
     saveTasks(tasks);
     return true;
+  },
+
+  set_task_recurrence(args: any): MockTask {
+    if (args.id?.startsWith('daily:')) throw new Error('cannot set recurrence on virtual instance');
+    const tasks = loadTasks();
+    const idx = tasks.findIndex(t => t.id === args.id);
+    if (idx === -1) throw new Error(`Task not found: ${args.id}`);
+    const t = tasks[idx];
+    if (t.template_id) throw new Error('cannot promote a materialized instance to a template');
+    t.recurrence_kind = (args.kind === 'daily' ? 'daily' : 'none') as RecurrenceKind;
+    t.updated_at = new Date().toISOString();
+    tasks[idx] = t;
+    saveTasks(tasks);
+    return t;
   },
 
   get_status(_args: any): any {
@@ -299,6 +367,7 @@ const handlers: Record<string, Function> = {
   },
 
   start_task(args: any): MockTask | null {
+    if (args.id?.startsWith('daily:')) return null; // virtual id: no-op
     const tasks = loadTasks();
     const idx = tasks.findIndex(t => t.id === args.id);
     if (idx === -1) return null;
@@ -310,6 +379,7 @@ const handlers: Record<string, Function> = {
   },
 
   pause_task(args: any): MockTask | null {
+    if (args.id?.startsWith('daily:')) return null;
     const tasks = loadTasks();
     const idx = tasks.findIndex(t => t.id === args.id);
     if (idx === -1) return null;
@@ -327,6 +397,7 @@ const handlers: Record<string, Function> = {
   },
 
   resume_task(args: any): MockTask | null {
+    if (args.id?.startsWith('daily:')) return null;
     const tasks = loadTasks();
     const idx = tasks.findIndex(t => t.id === args.id);
     if (idx === -1) return null;
@@ -338,6 +409,7 @@ const handlers: Record<string, Function> = {
   },
 
   end_task(args: any): { task: MockTask; faith_update: any } {
+    if (args.id?.startsWith('daily:')) throw new Error('cannot end virtual task');
     const tasks = loadTasks();
     const idx = tasks.findIndex(t => t.id === args.id);
     if (idx === -1) throw new Error(`Task not found: ${args.id}`);
@@ -471,6 +543,11 @@ const handlers: Record<string, Function> = {
  * Invoke a backend command, falling back to in-browser mock when Tauri is unavailable.
  */
 export async function safeInvoke<T>(command: string, args: Record<string, any> = {}): Promise<T> {
+  // Delegate to real Tauri when running inside the Tauri shell
+  if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke(command, args) as Promise<T>;
+  }
   const handler = handlers[command];
   if (!handler) {
     throw new Error(`Mock: unknown command "${command}"`);

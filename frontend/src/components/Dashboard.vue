@@ -55,26 +55,26 @@ watch(selectedDate, loadData, { immediate: true });
           {{ v === "month" ? "月" : v === "week" ? "周" : "日" }}
         </button>
       </div>
-    </aside>
 
-    <!-- Right Content Area -->
-    <main class="content">
-      <!-- Readonly banner for past dates -->
+      <!-- Moved: Readonly banner for past dates -->
       <div v-if="isPast" class="readonly-banner">
         <span class="readonly-icon">&#128274;</span>
         历史记录只读
       </div>
 
+      <!-- Moved: Faith Section -->
+      <div class="faith-section">
+        <StatusPanel v-if="faithStore.faithStatus" />
+        <FaithDashboard v-if="faithStore.faithStatus" :status="faithStore.faithStatus" />
+      </div>
+    </aside>
+
+    <!-- Right Content Area -->
+    <main class="content">
       <!-- Date Header -->
       <div class="date-header">
         <h2 class="date-title">{{ formattedDate }}</h2>
         <span v-if="isToday" class="today-badge">今天</span>
-      </div>
-
-      <!-- Faith Card (Daily Stats) -->
-      <div class="faith-section">
-        <StatusPanel v-if="faithStore.faithStatus" />
-        <FaithDashboard v-if="faithStore.faithStatus" :status="faithStore.faithStatus" />
       </div>
 
       <!-- Task List -->
@@ -95,7 +95,7 @@ watch(selectedDate, loadData, { immediate: true });
 }
 
 .sidebar {
-  width: 280px;
+  width: 320px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -105,7 +105,7 @@ watch(selectedDate, loadData, { immediate: true });
 .view-toggle {
   display: flex;
   gap: 4px;
-  background: var(--color-bg);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 4px;
@@ -137,6 +137,12 @@ watch(selectedDate, loadData, { immediate: true });
   gap: 16px;
 }
 
+.date-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .readonly-banner {
   display: flex;
   align-items: center;
@@ -161,7 +167,7 @@ watch(selectedDate, loadData, { immediate: true });
 }
 
 .date-title {
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--color-text);
   margin: 0;
@@ -180,6 +186,10 @@ watch(selectedDate, loadData, { immediate: true });
   display: flex;
   flex-direction: column;
   gap: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 16px;
 }
 
 .task-section {
@@ -190,5 +200,6 @@ watch(selectedDate, loadData, { immediate: true });
   border: 1px solid var(--color-border);
   border-radius: 16px;
   padding: 16px;
+  flex: 1;
 }
 </style>

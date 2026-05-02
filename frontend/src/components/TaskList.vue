@@ -98,6 +98,7 @@ function categoryLabel(cat: string): string {
         <div class="task-info">
           <div class="task-top">
             <span class="task-title">{{ task.title }}</span>
+            <span v-if="(task.recurrence_kind ?? 'none') === 'daily' || task.template_id" class="recurring-badge">每日</span>
             <span class="task-category" :data-cat="task.category">{{ categoryLabel(task.category) }}</span>
           </div>
           <div class="task-meta">
@@ -242,6 +243,16 @@ function categoryLabel(cat: string): string {
 .task-category[data-cat="work"] { background: var(--color-survival); color: #1a1a24; }
 .task-category[data-cat="study"] { background: var(--color-progress); color: #1a1a24; }
 .task-category[data-cat="other"] { background: var(--color-discipline); color: #1a1a24; }
+
+.recurring-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--color-primary);
+  color: #1a1a24;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
 
 .task-meta {
   font-size: 0.8125rem;

@@ -8,7 +8,8 @@ export async function invoke_create_task(
   description: string,
   category: string,
   estimated_minutes: number,
-  date?: string
+  date?: string,
+  recurrenceKind?: 'none' | 'daily'
 ): Promise<Task> {
   return safeInvoke<Task>("create_task", {
     userId: DEFAULT_USER_ID,
@@ -17,6 +18,7 @@ export async function invoke_create_task(
     category,
     estimatedMinutes: estimated_minutes,
     date: date ?? null,
+    recurrenceKind,
   });
 }
 
@@ -94,6 +96,10 @@ export async function invoke_abandon_task(id: string): Promise<Task> {
 
 export async function invoke_delete_task(id: string): Promise<boolean> {
   return safeInvoke<boolean>("delete_task", { id });
+}
+
+export async function invoke_set_task_recurrence(id: string, kind: string): Promise<Task> {
+  return safeInvoke<Task>("set_task_recurrence", { id, kind });
 }
 
 export async function invoke_get_daily_stats(date: string): Promise<DailyStats> {

@@ -89,6 +89,15 @@ pub fn init_schema(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     ensure_column(conn, "tasks", "started_at", "TEXT")?;
     ensure_column(conn, "tasks", "duration_seconds", "INTEGER NOT NULL DEFAULT 0")?;
     ensure_column(conn, "tasks", "ai_summary", "TEXT")?;
+    ensure_column(conn, "tasks", "date", "TEXT NOT NULL DEFAULT ''")?;
+    ensure_column(conn, "tasks", "recurrence_kind", "TEXT NOT NULL DEFAULT 'none'")?;
+    ensure_column(conn, "tasks", "template_id", "TEXT")?;
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_tasks_user_recurrence_kind
+           ON tasks(user_id, recurrence_kind) WHERE recurrence_kind != 'none';
+         CREATE INDEX IF NOT EXISTS idx_tasks_template_id_date
+           ON tasks(template_id, date) WHERE template_id IS NOT NULL;",
+    )?;
     Ok(())
 }
 
