@@ -366,11 +366,28 @@ fn main() {
 
     info!("Starting 牛马信仰 backend…");
 
-    let exe_dir = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-    let db_path = exe_dir.join("niuma_faith.db");
+    // 优先使用用户数据目录，兼容开发环境
+    let db_path = if let Some(local_dir) = dirs::data_local_dir() {
+        let app_dir = local_dir.join("牛马信仰");
+        std::fs::create_dir_all(&app_dir).ok();
+        let user_db = app_dir.join("niuma_faith.db");
+        if user_db.exists() {
+            user_db
+        } else {
+            // 用户目录无db，回退到exe同目录（开发时）
+            let exe_dir = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+                .unwrap_or_else(|| std::env::current_dir().unwrap());
+            exe_dir.join("niuma_faith.db")
+        }
+    } else {
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        exe_dir.join("niuma_faith.db")
+    };
 
     info!("Database path: {:?}", db_path);
     let db = Arc::new(
