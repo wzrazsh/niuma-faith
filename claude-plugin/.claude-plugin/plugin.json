@@ -1,0 +1,10 @@
+{
+  "name": "niuma-faith",
+  "version": "1.0.0",
+  "description": "Integrate Claude Code sessions with Niuma Faith task tracking. Automatically creates and completes tasks for each session.",
+  "author": {
+    "name": "Niuma Faith"
+  },
+  "license": "MIT",
+  "keywords": ["niuma", "faith", "productivity", "task-tracking"]
+}
