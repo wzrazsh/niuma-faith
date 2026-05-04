@@ -33,6 +33,7 @@ npm-debug.log*
 .omc
 .claude
 .history
+__pycache__/
 test-output/
 prd.json
 progress.txt
