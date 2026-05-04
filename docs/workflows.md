@@ -449,11 +449,11 @@ if is_historical(&task.date) {
 
 ---
 
-## 11. 项目任务远程推送流程
+## 10. 项目任务远程推送流程
 
 项目任务由开发工具通过本地 HTTP API 主动推送，不是用户手动创建。
 
-### 11.1 创建项目任务
+### 10.1 创建项目任务
 
 ```
 [开发工具] Claude/Codex/OpenCode 启动工作会话
@@ -483,7 +483,7 @@ if is_historical(&task.date) {
     项目任务在 UI 中只读，不可编辑/删除/手动完成
 ```
 
-### 11.2 更新项目任务状态
+### 10.2 更新项目任务状态
 
 ```
 [开发工具] 用户暂停工具 / 恢复工作
@@ -506,7 +506,7 @@ if is_historical(&task.date) {
     5. 返回 200 { task_id, session_id, status }
 ```
 
-### 11.3 完成项目任务
+### 10.3 完成项目任务
 
 ```
 [开发工具] 工作会话结束
@@ -532,7 +532,7 @@ if is_historical(&task.date) {
        duration_minutes: work_minutes, faith_contributed: delta }
 ```
 
-### 11.4 放弃项目任务
+### 10.4 放弃项目任务
 
 ```
 [开发工具] 会话异常终止
@@ -545,7 +545,7 @@ if is_historical(&task.date) {
     3. 已结算的 minutes 不回收
 ```
 
-### 11.5 项目任务保护规则
+### 10.5 项目任务保护规则
 
 ```
 [前端] 用户尝试编辑/完成/放弃/删除项目任务
@@ -561,7 +561,7 @@ if is_historical(&task.date) {
 
 ---
 
-## 12. 首屏初始化流程
+## 11. 首屏初始化流程
 
 ```
 [应用启动]

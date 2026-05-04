@@ -226,7 +226,7 @@ let app_state = AppState::new(db);
 2. 创建 `TaskService::new(db)`
 3. `FaithService::get_or_create_user()` → 若 `users` 表无 `default_user` 记录则插入
 
-### 4.5 Local HTTP Server
+### 4.4 Local HTTP Server
 
 牛马信仰在启动时同时开启一个本地 HTTP 服务，供开发工具（Claude、Codex、OpenCode 等）主动推送项目任务。
 
@@ -277,7 +277,7 @@ HTTP Request → LocalHttpServer
       GET /api/tasks/{id}     → TaskService::get_project_task
 ```
 
-### 4.4 关键 Rust 模块
+### 4.5 关键 Rust 模块
 
 **`domain/faith.rs`**
 - `calc_survival(minutes: i32) -> i32`：阶梯函数，120/240/360/480 分钟为阈值，分别返回 0/100/200/300/400
@@ -319,20 +319,20 @@ HTTP Request → LocalHttpServer
   - **项目任务保护**：`task_type = 'project'` 的任务在前端只读，不可通过 Tauri 命令 edit/complete/abandon/delete
   - **项目任务查询**：`get_project_task(session_id)` 按 tool_session_id 查找
 
-### 4.5 数据库路径策略
+### 4.6 数据库路径策略
 
 ```
 优先级 1: dirs::data_local_dir()/牛马信仰/niuma_faith.db  (若已存在)
 优先级 2: exe 所在目录 / niuma_faith.db                    (开发兼容)
 ```
 
-### 4.6 系统托盘
+### 4.7 系统托盘
 
 - 左键单击托盘图标 → 显示主窗口
 - 右键菜单：显示主窗口 / 打开悬浮窗 / 退出
 - `show_menu_on_left_click(false)` — 左键不弹菜单，只触发显示窗口
 
-### 4.7 窗口配置
+### 4.8 窗口配置
 
 | 窗口 | 标签 | 尺寸 | 特性 |
 |------|------|------|------|

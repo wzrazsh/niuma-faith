@@ -74,14 +74,14 @@ npm run tauri build
 
 ## 信仰计算
 
-- **Survival faith** — 从 Work 任务实际时长计算（每 2h 一档，上限 40）
-- **Progress faith** — 从 Study 任务实际时长计算（每 2h 一档，上限 40）
-- **Daily max** — 100 pts
-- **discipline_faith** — 已从任务系统移除
+- **Survival faith** — 从 Work 任务实际时长计算（每 2h 一档，上限 400）
+- **Progress faith** — 从 Study 任务实际时长计算（每 2h 一档，上限 400）
+- **Discipline faith** — 打卡时由中断次数/离岗记录/记录闭环计算（上限 200）
+- **Daily max** — 1000 pts
 
 ## 任务系统
 
 - `TaskCategory`: Work / Study / Other
-- `TaskStatus`: Active / Completed / Abandoned
+- `TaskStatus`: Running / Paused / Completed / Abandoned
 - 完成任务获得 bonus faith（Work/Study +5/hr，Other +2/hr）
 - 历史任务不可编辑/删除/完成

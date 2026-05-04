@@ -12,7 +12,7 @@ Design specifications, requirements documents, and task documentation for the �
 | `vision.md` | Product vision and design principles |
 | `design-doc.md` | System architecture and module design (single source of truth) |
 | `data-model.md` | Complete database schema (5 tables, DDL, migrations) |
-| `api-contract.md` | Frontend↔Backend API contracts (23 Tauri commands) |
+| `api-contract.md` | Frontend↔Backend API contracts (25 Tauri commands) |
 | `workflows.md` | Core business processes (check-in, task lifecycle, etc.) |
 | `ui-spec.md` | UI components and interaction specifications |
 | `build-guide.md` | Build and restore guide |
