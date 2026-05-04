@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS daily_records (
     progress_faith   INTEGER NOT NULL DEFAULT 0,
     discipline_faith INTEGER NOT NULL DEFAULT 0,
     total_faith      INTEGER NOT NULL DEFAULT 0,
+    task_bonus_work  INTEGER NOT NULL DEFAULT 0,   -- 增量迁移添加
+    task_bonus_study INTEGER NOT NULL DEFAULT 0,   -- 增量迁移添加
     break_count      INTEGER NOT NULL DEFAULT 0,
     leave_record     INTEGER NOT NULL DEFAULT 0,
     close_record     INTEGER NOT NULL DEFAULT 0,
@@ -82,7 +84,9 @@ CREATE INDEX IF NOT EXISTS idx_daily_user_date ON daily_records(user_id, date);
 | survival_faith | `i32` | `number` | 当日生存信仰（calc_survival(work_minutes)） |
 | progress_faith | `i32` | `number` | 当日精进信仰（calc_progress(study_minutes)） |
 | discipline_faith | `i32` | `number` | 当日戒律信仰（a+b+c） |
-| total_faith | `i32` | `number` | 当日总信仰（三者和） |
+| total_faith | `i32` | `number` | 当日总信仰 = survival + progress + discipline + task_bonus_work + task_bonus_study |
+| task_bonus_work | `i32` | `number` | 当日 work 类任务完成奖励总和 |
+| task_bonus_study | `i32` | `number` | 当日 study 类任务完成奖励总和 |
 | break_count | `i32` | `number` | 休息/中断次数 |
 | leave_record | `i32` | `number` | 离岗记录：0=无/已解释, 1=已解释, 2=未解释 |
 | close_record | `i32` | `number` | 记录闭环：0=未完成, ≥1=已完成 |
@@ -252,6 +256,8 @@ CREATE INDEX IF NOT EXISTS idx_faith_tx_user_ts ON faith_transactions(user_id, t
 | tasks | task_type | `TEXT NOT NULL DEFAULT 'daily'` | v2.1 |
 | tasks | source_tool | `TEXT` | v2.1 |
 | tasks | tool_session_id | `TEXT` | v2.1 |
+| daily_records | task_bonus_work | `INTEGER NOT NULL DEFAULT 0` | v2.1 |
+| daily_records | task_bonus_study | `INTEGER NOT NULL DEFAULT 0` | v2.1 |
 
 ### 3.3 增量索引
 
@@ -291,8 +297,8 @@ CREATE INDEX IF NOT EXISTS idx_tasks_task_type
 | `mock-user` | `MockUser` JSON | 用户状态 |
 | `kanban-board-config` | `BoardConfig` JSON | 看板列配置 |
 
-**Mock 与真实后端的差异**（已知，不影响开发）：
-- Mock 的等级阈值与后端不一致（Mock 使用旧版 v1 阈值）
-- Mock 的 `check_in` 不真正计算信仰（仅标记 check_in_done）
-- Mock 的 `get_daily_stats` 不计算任务奖励
-- Mock 的进程检测恒返回 false
+**Mock 与真实后端的差异**（代码生成时必须消除以下差异）：
+- Mock 的等级阈值必须与后端一致（使用 v2.0 ×10 阈值表）
+- Mock 的 `check_in` 应真正计算信仰（非仅标记 check_in_done）
+- Mock 的 `get_daily_stats` 应计算任务奖励
+- Mock 的进程检测恒返回 false（开发环境正常行为）

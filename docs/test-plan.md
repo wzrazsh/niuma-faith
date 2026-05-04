@@ -8,7 +8,7 @@
 
 | 层次 | 框架 | 状态 | 覆盖范围 |
 |------|------|------|----------|
-| Rust 单元测试 | `#[cfg(test)]` in-module | ✅ 141 passed | domain / data / application / tauri |
+| Rust 单元测试 | `#[cfg(test)]` in-module | ✅ passed | domain / data / application / tauri |
 | 前端类型检查 | `vue-tsc --noEmit` | ✅ 0 errors | 类型安全 |
 | 前端构建 | `vite build` | ✅ 通过 | 模块打包 |
 | E2E 测试 | Playwright | 🔲 未配置 | 端到端 |
@@ -164,7 +164,11 @@
 
 ```
 初始化 → 创建 Work 任务 480min → 创建 Study 任务 240min
-→ 完成任务 → 验证 FaithStatus.total_faith = 800
+→ 完成任务 → 验证 daily_records:
+  survival_faith = 400, progress_faith = 200
+  task_bonus_work = 40, task_bonus_study = 20
+  total_faith = 400 + 200 + 0 + 40 + 20 = 660
+→ 验证 FaithStatus.cumulative_faith = 660
 → 验证 armor 字段存在且 >= 0
 → 验证 level 正确计算
 ```
@@ -244,7 +248,7 @@ Day 2: 签到 → 完成 8h work + 8h study → 累计信仰 +1000
 
 ## 八、回归测试清单（每次发布前执行）
 
-- [ ] `cargo test` — 所有 141 项 Rust 测试通过
+- [ ] `cargo test` — 全部 Rust 测试通过
 - [ ] `npx vite build` — 前端构建成功
 - [ ] 手动启动 Tauri — 主窗口 + 悬浮窗 + 系统托盘正常
 - [ ] 创建 Work 任务 480min → 完成 → 验证生存信仰 = 400

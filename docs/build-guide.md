@@ -227,6 +227,7 @@ thiserror = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dirs = "5"
+tiny_http = "0.12"
 
 [dev-dependencies]
 tempfile = "3"
@@ -301,7 +302,7 @@ npm run build
 ```bash
 cd src-tauri
 cargo test
-# 期望: 141 passed
+# 期望: 全部通过
 ```
 
 ### 4.6 完整 Tauri 开发模式
@@ -347,7 +348,7 @@ npm run tauri build
 - [ ] `npm install` 成功
 - [ ] `npx vue-tsc --noEmit` 0 错误
 - [ ] `npm run build` 成功
-- [ ] `cd src-tauri && cargo test` 141 passed
+- [ ] `cd src-tauri && cargo test` 全部通过
 - [ ] `npm run tauri dev` 能启动应用
 
 ### 6.2 功能检查

@@ -408,7 +408,8 @@ discipline_faith = a + b + c                     // 0~200
   a (专注稳定) = break_count ≤2 ? 80 : (≤4 ? 40 : 0)
   b (离岗纪律) = leave_record ==0 ? 60 : (==1 ? 30 : 0)
   c (记录闭环) = close_record ≥1 ? 60 : 0
-total_faith = survival + progress + discipline   // 0~1000
+daily_record.total_faith = survival + progress + discipline + task_bonus_work + task_bonus_study
+// 三信仰支柱上限 1000，任务奖励可叠加超出
 ```
 
 ### 6.2 等级系统
