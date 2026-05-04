@@ -28,13 +28,13 @@
 │  │  浏览器环境 → localStorage Mock (完整业务逻辑)      │      │
 │  └─────────────────────────────────────────────────────┘      │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              │ Tauri IPC (JSON 序列化)
-                              │
+                               │
+                               │ Tauri IPC (JSON 序列化)
+                               │
 ┌─────────────────────────────────────────────────────────────┐
 │  后端 (Rust + Tauri v2 + SQLite)                            │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │  Tauri Commands (#[tauri::command]) — 21 个命令     │    │
+│  │  Tauri Commands (#[tauri::command]) — 25 个命令     │    │
 │  │  main.rs 中注册，tauri/commands.rs 中复用于测试    │    │
 │  └─────────────────────────────────────────────────────┘    │
 │         │                                                    │
@@ -48,6 +48,19 @@
 │  │  Data Layer (SQLite via rusqlite, bundled)          │     │
 │  │  5 张表 + WAL 模式 + Mutex 并发保护                 │     │
 │  └─────────────────────────────────────────────────────┘     │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │  Local HTTP Server (tiny_http)                       │    │
+│  │  127.0.0.1:{port} — 开发工具推送接口                  │    │
+│  │  POST/PUT/GET → TaskService → 项目任务生命周期      │    │
+│  └──────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+                               ↑
+                               │ HTTP POST/PUT (JSON)
+                               │
+┌──────────────────────────────┴──────────────────────────────┐
+│  开发工具 (Claude / Codex / OpenCode / ...)                 │
+│  通过本地 HTTP API 推送任务：创建 / 更新 / 完成 / 放弃      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -65,6 +78,7 @@
 | 数据库 | SQLite | bundled | rusqlite 0.31，WAL 模式 |
 | 日期库 | chrono | 0.4 | Rust 端日期处理 |
 | 日志 | tracing | 0.1 | 结构化日志 |
+| HTTP 服务 | tiny_http | 0.12 | 本地 HTTP API，工具推送接口 |
 
 ## 3. 前端架构
 
@@ -169,11 +183,12 @@ src-tauri/src/
 │   ├── mod.rs               # 导出三大服务
 │   ├── faith_service.rs     # 信仰服务：check_in, get_status, get_today_record, get_or_create_user
 │   ├── ledger_service.rs    # 记账服务：upsert_daily_record（核心：计算 delta → 更新 daily_records → add_faith → 插入流水）
-│   └── task_service.rs      # 任务服务：~1150 行，完整的任务生命周期 + 虚拟实例 + 历史保护
+│   └── task_service.rs      # 任务服务：~1150 行，完整的任务生命周期 + 虚拟实例 + 历史保护 + 项目任务
 └── tauri/                   # UI 适配层
     ├── mod.rs               # 导出 state / commands
     ├── state.rs             # AppState：Arc<SqliteDb> → FaithService + TaskService
     └── commands.rs          # 全部 #[tauri::command] 定义，供 main.rs 注册和测试复用
+└── local_server.rs          # 本地 HTTP Server：监听 127.0.0.1，处理工具推送请求
 ```
 
 ### 4.2 分层数据流
@@ -210,6 +225,57 @@ let app_state = AppState::new(db);
 1. 创建 `FaithService::new(db)` → 同时创建 `FaithLedgerService`
 2. 创建 `TaskService::new(db)`
 3. `FaithService::get_or_create_user()` → 若 `users` 表无 `default_user` 记录则插入
+
+### 4.5 Local HTTP Server
+
+牛马信仰在启动时同时开启一个本地 HTTP 服务，供开发工具（Claude、Codex、OpenCode 等）主动推送项目任务。
+
+**启动流程**：
+```rust
+// main.rs，在 AppState 创建后
+let port = find_available_port();
+let token = generate_random_token(16);
+
+write_port_file(&data_dir, port)?;
+write_token_file(&data_dir, &token)?;
+
+let server = LocalHttpServer::new(app_state.clone(), port, token);
+std::thread::spawn(move || server.run());
+```
+
+**依赖**：`tiny_http` crate（轻量级，无 async runtime）
+
+**监听**：仅 `127.0.0.1`，不对外暴露
+
+**端点路由**：
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/health` | 健康检查 |
+| POST | `/api/tasks` | 创建项目任务 |
+| PUT | `/api/tasks/{session_id}` | 更新任务状态 |
+| POST | `/api/tasks/{session_id}/complete` | 完成任务 + 结算工时 |
+| POST | `/api/tasks/{session_id}/abandon` | 放弃任务 |
+| GET | `/api/tasks/{session_id}` | 查询任务状态 |
+
+**认证**：每个请求 Header 需携带 `Authorization: Bearer {token}`
+
+**端口/Token 文件**：
+- `{data_local_dir}/牛马信仰/http_port.txt` — 当前端口
+- `{data_local_dir}/牛马信仰/http_token.txt` — 当前 Token
+- 应用退出时自动删除
+
+**与 TaskService 的关系**：
+```
+HTTP Request → LocalHttpServer
+  → 验证 Token
+  → 解析 JSON body
+  → 路由到 TaskService 对应方法:
+      POST /api/tasks         → TaskService::create_project_task(...)
+      PUT /api/tasks/{id}     → TaskService::pause_task / resume_task
+      POST .../complete       → TaskService::end_task + 结算工时
+      POST .../abandon        → TaskService::abandon_task
+      GET /api/tasks/{id}     → TaskService::get_project_task
+```
 
 ### 4.4 关键 Rust 模块
 
@@ -250,6 +316,8 @@ let app_state = AppState::new(db);
   - **历史保护**：`is_historical(date)` 阻止对过去日期任务的修改/完成/放弃/删除
   - **计时联动**：`pause_task` / `end_task` 自动关闭当前 session，计算秒数，累加到当日 `daily_records` 的 work/study_minutes，并通过 ledger 重新计算日信仰
   - **任务奖励**：`complete_task` 调用 `calc_task_bonus`，通过 `apply_task_bonus` 累加到日记录与累计信仰
+  - **项目任务保护**：`task_type = 'project'` 的任务在前端只读，不可通过 Tauri 命令 edit/complete/abandon/delete
+  - **项目任务查询**：`get_project_task(session_id)` 按 tool_session_id 查找
 
 ### 4.5 数据库路径策略
 

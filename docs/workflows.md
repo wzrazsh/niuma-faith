@@ -449,7 +449,119 @@ if is_historical(&task.date) {
 
 ---
 
-## 10. 首屏初始化流程
+## 11. 项目任务远程推送流程
+
+项目任务由开发工具通过本地 HTTP API 主动推送，不是用户手动创建。
+
+### 11.1 创建项目任务
+
+```
+[开发工具] Claude/Codex/OpenCode 启动工作会话
+    1. 读取 {data_dir}/牛马信仰/http_port.txt 获取端口
+    2. 读取 {data_dir}/牛马信仰/http_token.txt 获取 Token
+    3. 生成 session_id (UUID)
+    4. 根据上下文生成 title
+    ↓
+[HTTP] POST http://127.0.0.1:{port}/api/tasks
+    Headers: Authorization: Bearer {token}
+    Body: { action:"create", tool_name:"claude", session_id:"uuid", title:"重构用户认证模块" }
+    ↓
+[后端] local_server.rs 路由 → TaskService
+    1. 验证 Token
+    2. 解析 JSON body
+    3. check session_id 去重：SELECT * FROM tasks WHERE tool_session_id=?
+       ├─ 已存在 → 返回 409 { error: "session already exists", task_id: "..." }
+       └─ 不存在 → 继续
+    4. 生成 UUID 作为 task_id
+    5. INSERT tasks (id, user_id, date=今天, title, category='work',
+       task_type='project', source_tool=tool_name,
+       tool_session_id=session_id, status='running', started_at=now)
+    6. INSERT task_sessions (task_id, start_ts=now, end_ts=NULL, seconds=0)
+    7. 返回 201 { task_id, session_id, status: "running", created_at }
+    ↓
+[前端] 自动（非本次请求触发）：看板下次刷新时显示新的项目任务
+    项目任务在 UI 中只读，不可编辑/删除/手动完成
+```
+
+### 11.2 更新项目任务状态
+
+```
+[开发工具] 用户暂停工具 / 恢复工作
+    ↓
+[HTTP] PUT http://127.0.0.1:{port}/api/tasks/{session_id}
+    Body: { action:"update", status:"paused" }
+    ↓
+[后端] local_server.rs → TaskService
+    1. 查 task：SELECT * FROM tasks WHERE tool_session_id=?
+    2. 验证 task_type = 'project'
+    3. 验证当前 status 为 running 或 paused
+    4. IF status == "paused":
+         ├─ TaskSessionRepo::end_open_session(task_id) → 计算 seconds
+         ├─ UPDATE tasks SET duration_seconds += seconds, status='paused'
+         ├─ 将 minutes 累加到 daily_records.work_minutes
+         └─ LedgerService::upsert_daily_record() → 重新计算当日信仰
+       IF status == "running":
+         ├─ UPDATE tasks SET status='running', started_at=now
+         └─ TaskSessionRepo::start_session(task_id, now_ts)
+    5. 返回 200 { task_id, session_id, status }
+```
+
+### 11.3 完成项目任务
+
+```
+[开发工具] 工作会话结束
+    ↓
+[HTTP] POST http://127.0.0.1:{port}/api/tasks/{session_id}/complete
+    Body: { title:"...", summary:"完成了JWT认证重构" }
+    ↓
+[后端] local_server.rs → TaskService
+    1. 查 task：SELECT * FROM tasks WHERE tool_session_id=?
+    2. 验证 task_type = 'project' 且 status IN ('running', 'paused')
+    3. 若 status=running → 关闭当前 session（同 pause 逻辑）
+    4. 计算总 duration_seconds（所有 sessions 之和）
+    5. work_minutes = duration_seconds / 60
+    6. 更新 daily_records.work_minutes += work_minutes
+    7. LedgerService::upsert_daily_record() → 重新计算当日信仰
+       ├─ survival_faith 可能因 work_minutes 达到阶梯（120→100, 240→200, 360→300, 480→400）
+       ├─ delta = new_total - old_total
+       ├─ UserRepo::add_faith(delta)
+       └─ INSERT faith_transactions (delta, kind='project_task', ref_id=task_id)
+    8. UPDATE tasks SET status='completed', completed_at=now,
+       actual_minutes=work_minutes, ai_summary=summary（若有）, updated_at=now
+    9. 返回 200 { task_id, session_id, status:"completed",
+       duration_minutes: work_minutes, faith_contributed: delta }
+```
+
+### 11.4 放弃项目任务
+
+```
+[开发工具] 会话异常终止
+    ↓
+[HTTP] POST .../api/tasks/{session_id}/abandon
+    ↓
+[后端]
+    1. 若 status=running → 关闭 session，结算已工作时长（同 pause）
+    2. UPDATE tasks SET status='abandoned'
+    3. 已结算的 minutes 不回收
+```
+
+### 11.5 项目任务保护规则
+
+```
+[前端] 用户尝试编辑/完成/放弃/删除项目任务
+    ↓
+[API] update_task / complete_task / abandon_task / delete_task
+    ↓
+[后端] TaskService 检查：
+    IF task.task_type == 'project':
+        RETURN Err("project task cannot be modified via UI")
+```
+
+项目任务仅能通过 HTTP API（来自其 source_tool）修改状态和内容。
+
+---
+
+## 12. 首屏初始化流程
 
 ```
 [应用启动]
@@ -459,8 +571,10 @@ if is_historical(&task.date) {
     2. 打开 SQLite 数据库（自动 init_schema + 迁移）
     3. 创建 AppState → FaithService + TaskService
     4. FaithService::get_or_create_user() → 确保 default_user 存在
-    5. 创建主窗口（900×700）
-    6. 创建系统托盘
+    5. 分配随机端口，启动 Local HTTP Server (127.0.0.1:{port})
+    6. 写入 http_port.txt 和 http_token.txt 到 data 目录
+    7. 创建主窗口（900×700）
+    8. 创建系统托盘
     ↓
 [前端] App.vue mounted
     IF 非悬浮窗路由:

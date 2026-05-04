@@ -120,7 +120,10 @@ CREATE TABLE IF NOT EXISTS tasks (
     ai_summary        TEXT,                       -- 增量迁移
     updated_at        TEXT NOT NULL,
     recurrence_kind   TEXT NOT NULL DEFAULT 'none', -- 增量迁移：'none' | 'daily'
-    template_id       TEXT                        -- 增量迁移：指向模板任务的自引用
+    template_id       TEXT,                       -- 增量迁移：指向模板任务的自引用
+    task_type        TEXT NOT NULL DEFAULT 'daily', -- 增量迁移：'daily' | 'project'
+    source_tool      TEXT,                        -- 增量迁移：来源工具名(project任务)
+    tool_session_id  TEXT                         -- 增量迁移：工具侧唯一会话ID
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_user_status ON tasks(user_id, status);
@@ -150,11 +153,17 @@ CREATE INDEX IF NOT EXISTS idx_tasks_template_id_date
 | updated_at | `String` | `string` | 更新时间戳 |
 | recurrence_kind | `RecurrenceKind` | `RecurrenceKind` | none / daily |
 | template_id | `Option<String>` | `string \| null` | 指向同表模板任务的 id（自引用） |
+| task_type | `TaskType` | `TaskType` | daily / project |
+| source_tool | `Option<String>` | `string \| null` | 来源工具名（如 claude/codex/opencode），project 任务专用 |
+| tool_session_id | `Option<String>` | `string \| null` | 工具侧唯一会话 ID，用于去重和后续更新 |
 
 **业务关系**:
 - **模板任务**: `recurrence_kind = 'daily'` 且 `template_id IS NULL` → 这是每日重复模板
 - **实例任务**: `template_id = {模板id}` 且 `recurrence_kind = 'none'` → 某一天的实例
 - **虚拟实例**: 查询时内存合成的 `daily:{template_id}:{date}`，首次操作才物化为真实行
+- **日常任务**: `task_type = 'daily'` → 用户手动创建和管理
+- **项目任务**: `task_type = 'project'` → 由开发工具远程推送创建，用户只读
+- **去重**: `tool_session_id` 用于项目任务去重，同一 session_id 不可重复创建
 
 ---
 
@@ -240,6 +249,9 @@ CREATE INDEX IF NOT EXISTS idx_faith_tx_user_ts ON faith_transactions(user_id, t
 | tasks | date | `TEXT NOT NULL DEFAULT ''` | — |
 | tasks | recurrence_kind | `TEXT NOT NULL DEFAULT 'none'` | — |
 | tasks | template_id | `TEXT` | — |
+| tasks | task_type | `TEXT NOT NULL DEFAULT 'daily'` | v2.1 |
+| tasks | source_tool | `TEXT` | v2.1 |
+| tasks | tool_session_id | `TEXT` | v2.1 |
 
 ### 3.3 增量索引
 
@@ -249,6 +261,10 @@ CREATE INDEX IF NOT EXISTS idx_tasks_user_recurrence_kind
     ON tasks(user_id, recurrence_kind) WHERE recurrence_kind != 'none';
 CREATE INDEX IF NOT EXISTS idx_tasks_template_id_date
     ON tasks(template_id, date) WHERE template_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tasks_tool_session
+    ON tasks(tool_session_id) WHERE tool_session_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tasks_task_type
+    ON tasks(user_id, task_type);
 ```
 
 ## 4. Rust ↔ TypeScript 类型映射
@@ -262,6 +278,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_template_id_date
 | `TaskCategory` | `"work" \| "study" \| "other"` | `#[serde(rename_all = "lowercase")]` |
 | `TaskStatus` | `"running" \| "paused" \| "completed" \| "abandoned"` | 同上 |
 | `RecurrenceKind` | `"none" \| "daily"` | 同上 |
+| `TaskType` | `"daily" \| "project"` | 同上 |
 
 ## 5. 前端 localStorage Mock Schema
 

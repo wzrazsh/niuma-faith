@@ -12,7 +12,7 @@
 
 ## 2. 命令总览
 
-共 **21 个 Tauri 命令**，按功能分组：
+共 **24 个 Tauri 命令**，按功能分组：
 
 | # | 命令 | 分组 | 后端文件 |
 |---|------|------|----------|
@@ -36,9 +36,11 @@
 | 18 | `end_task` | 任务 | main.rs |
 | 19 | `set_task_recurrence` | 任务 | commands.rs |
 | 20 | `get_daily_stats` | 统计 | commands.rs |
-| 21 | `open_floating_widget` | 窗口 | main.rs |
-| 22 | `close_floating_widget` | 窗口 | main.rs |
-| 23 | `show_main_window` | 窗口 | main.rs |
+| 21 | `get_project_task` | 任务 | commands.rs |
+| 22 | `get_project_tasks` | 任务 | commands.rs |
+| 23 | `open_floating_widget` | 窗口 | main.rs |
+| 24 | `close_floating_widget` | 窗口 | main.rs |
+| 25 | `show_main_window` | 窗口 | main.rs |
 
 ## 3. 详细契约
 
@@ -607,5 +609,162 @@ Rust 后端使用 snake_case，前端调用使用 camelCase。Tauri 的 JSON 序
 | `"cannot abandon virtual task"` | abandon_task | 试图放弃虚拟任务 |
 | `"cannot set recurrence on virtual instance"` | set_task_recurrence | 对虚拟实例设置重复 |
 | `"cannot promote a materialized instance to a template"` | set_task_recurrence | 实例晋升为模板 |
+| `"project task cannot be modified via UI"` | update_task, complete_task, abandon_task, delete_task | 试图从前端修改项目任务 |
 | `"Unsupported platform"` | is_process_running, list_processes | 非 Windows 平台 |
 | 各类数据库错误 | 多个 | rusqlite 错误转字符串 |
+
+---
+
+## 6. 项目任务 Tauri 命令
+
+### 6.1 `get_project_task`
+
+按 tool_session_id 查询单个项目任务。
+
+```typescript
+// Request
+invoke("get_project_task", { sessionId: string })
+
+// Response: Task | null
+// 返回匹配 tool_session_id 的任务，不存在返回 null
+```
+
+**后端**: `TaskService::get_project_task(session_id)` → 查询 `tasks WHERE tool_session_id=?`
+
+---
+
+### 6.2 `get_project_tasks`
+
+获取当前所有活跃的项目任务。
+
+```typescript
+// Request
+invoke("get_project_tasks", { userId: string })
+
+// Response: Task[]
+// 返回 task_type='project' 且 status IN ('running','paused') 的任务列表
+```
+
+**后端**: `TaskService::get_project_tasks(user_id)` → 查询活跃项目任务
+
+---
+
+## 7. 本地 HTTP API（开发工具推送接口）
+
+牛马信仰启动时开启本地 HTTP Server（仅监听 127.0.0.1），供开发工具（Claude、Codex、OpenCode 等）主动推送任务。
+
+### 7.1 端口发现
+
+- 端口号写入 `{data_local_dir}/牛马信仰/http_port.txt`
+- 认证 Token 写入 `{data_local_dir}/牛马信仰/http_token.txt`
+- Token 格式: 16 字节 hex 随机字符串
+- 每次启动刷新，退出时删除
+
+### 7.2 API 端点
+
+所有请求需携带 Header: `Authorization: Bearer {token}`
+
+#### POST /api/tasks — 创建项目任务
+
+```
+Request Body:
+{
+  "action": "create",
+  "tool_name": "claude",
+  "session_id": "uuid-xxxx",
+  "title": "重构用户认证模块",
+  "description": ""
+}
+
+Response 201:
+{
+  "task_id": "uuid",
+  "session_id": "uuid-xxxx",
+  "status": "running",
+  "created_at": "2026-05-05T14:30:00+08:00"
+}
+```
+
+#### PUT /api/tasks/{session_id} — 更新任务状态
+
+```
+Request Body:
+{
+  "action": "update",
+  "status": "paused",
+  "title": "重构用户认证模块"
+}
+
+Response 200:
+{
+  "task_id": "uuid",
+  "session_id": "uuid-xxxx",
+  "status": "paused"
+}
+```
+
+#### POST /api/tasks/{session_id}/complete — 完成任务
+
+```
+Request Body (可选):
+{
+  "title": "重构用户认证模块",
+  "summary": "完成了JWT认证重构..."
+}
+
+Response 200:
+{
+  "task_id": "uuid",
+  "session_id": "uuid-xxxx",
+  "status": "completed",
+  "duration_minutes": 95,
+  "faith_contributed": 30
+}
+```
+
+#### POST /api/tasks/{session_id}/abandon — 放弃任务
+
+```
+Response 200:
+{
+  "task_id": "uuid",
+  "session_id": "uuid-xxxx",
+  "status": "abandoned"
+}
+```
+
+#### GET /api/tasks/{session_id} — 查询任务状态
+
+```
+Response 200:
+{
+  "task_id": "uuid",
+  "session_id": "uuid-xxxx",
+  "tool_name": "claude",
+  "title": "重构用户认证模块",
+  "status": "running",
+  "duration_seconds": 1800,
+  "created_at": "2026-05-05T14:30:00+08:00"
+}
+```
+
+#### GET /api/health — 健康检查
+
+```
+Response 200:
+{
+  "status": "ok",
+  "version": "2.0.0"
+}
+```
+
+### 7.3 HTTP 错误码
+
+| 状态码 | 含义 |
+|--------|------|
+| 200 | 成功 |
+| 201 | 创建成功 |
+| 400 | 请求体格式错误 |
+| 401 | Token 缺失或无效 |
+| 404 | 会话不存在 |
+| 409 | 会话已存在（重复创建） |
