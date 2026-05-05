@@ -25,6 +25,12 @@ This directory is the context-control layer for AI-assisted development. Keep do
 | `decisions.md` | Architecture Decision Records; accepted and rejected design choices |
 | `ai-collaboration.md` | AI collaboration rules, red lines, and required reading order |
 | `test-plan.md` | Testing plan and verification checklist |
+| `testing/strategy.md` | Test strategy, verification commands, and AI testing loop |
+| `testing/test-cases/` | Feature-level test cases and automation status |
+| `testing/acceptance-criteria/` | Structured acceptance criteria linked from tasks |
+| `testing/mocks-and-fixtures.md` | Mock runtime, fixtures, and test data rules |
+| `testing/bug-template.md` | Bug feedback template for AI repair loops |
+| `testing/regression-checklist.md` | Commit and release regression checklist |
 | `changelog.md` | Human-readable design and implementation change log |
 | `牛马信仰-需求文档.md` | Chinese requirements document; authoritative product requirements |
 
@@ -33,6 +39,7 @@ This directory is the context-control layer for AI-assisted development. Keep do
 | Directory | Purpose |
 |-----------|---------|
 | `archive/` | Closed-out specs and one-off task lists kept for history |
+| `testing/` | Test strategy, cases, acceptance criteria, fixtures, and regression gates |
 
 ## For AI Agents
 
@@ -44,12 +51,14 @@ Before changing code, read:
 2. `docs/vision.md`
 3. `docs/ai-collaboration.md`
 4. `docs/tasks.md`
-5. The domain-specific document for the change:
+5. `docs/testing/strategy.md`
+6. The domain-specific document for the change:
    - API/IPC: `api-contract.md`
    - Database: `data-model.md`
    - UI: `ui-spec.md`
    - Business flow: `workflows.md`
    - Architecture: `design-doc.md`
+   - Test/validation: `test-plan.md` and `testing/`
 
 ### Working In This Directory
 
@@ -57,14 +66,16 @@ Before changing code, read:
 - Closed-out implementation worklogs and completed designs live in `archive/` as read-only history.
 - Chinese documents are authoritative when product intent or naming is ambiguous.
 - Update `tasks.md` when a planned capability moves from idea to implementation or from implementation to verified.
+- Every active task in `tasks.md` should include acceptance criteria and a linked test case when the task affects behavior.
 - Update `decisions.md` when a design choice would otherwise be re-litigated.
 - Update `changelog.md` when a meaningful product, API, schema, or workflow change lands.
 
 ### Testing Requirements
 
-- Use `test-plan.md` for verification scope.
+- Use `testing/strategy.md` for verification rules and `test-plan.md` for full verification scope.
 - Use Playwright screenshots for visual verification when UI behavior or layout changes.
 - For API, data, or workflow changes, pair implementation updates with the relevant contract document.
+- Bug fixes should add or reference a reproducing test case before claiming completion.
 
 ### Common Patterns
 

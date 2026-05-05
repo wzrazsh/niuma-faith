@@ -30,10 +30,10 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { KanbanColumn, KanbanCard } from '@/types/kanban';
-import KanbanCardComp from './KanbanCard.vue';
+import type { KanbanColumn, KanbanCard as KanbanCardType } from '@/types/kanban';
+import KanbanCard from './KanbanCard.vue';
 
-const props = defineProps<{ column: KanbanColumn; cards: KanbanCard[] }>();
+const props = defineProps<{ column: KanbanColumn; cards: KanbanCardType[] }>();
 const emit = defineEmits<{ drop: [columnId: string, index: number]; addCard: []; deleteColumn: [] }>();
 
 const isDragOver = ref(false);

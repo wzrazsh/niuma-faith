@@ -11,6 +11,9 @@
 - Added `tasks.md` for current implementation state and active queue.
 - Added this `changelog.md` to prevent meaningful design and implementation changes from being lost between AI sessions.
 - Updated `ai-collaboration.md` so new AI sessions read the lightweight current-state documents before editing code.
+- Added `docs/testing/` with strategy, test cases, acceptance criteria, fixtures, bug template, and regression checklist.
+- Updated `tasks.md` so active tasks include acceptance criteria and linked test cases.
+- Updated `ai-collaboration.md` with explicit AI testing rules for code changes and bug fixes.
 
 ## Update Rules
 
