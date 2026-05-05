@@ -89,12 +89,8 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
         "
         CREATE INDEX IF NOT EXISTS idx_daily_user_date ON daily_records(user_id, date);
         CREATE INDEX IF NOT EXISTS idx_tasks_user_status ON tasks(user_id, status);
-        CREATE INDEX IF NOT EXISTS idx_tasks_user_recurrence ON tasks(user_id, recurrence_kind) WHERE recurrence_kind != 'none';
-        CREATE INDEX IF NOT EXISTS idx_tasks_template_id_date ON tasks(template_id, date) WHERE template_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS idx_task_sessions_task_id ON task_sessions(task_id);
         CREATE INDEX IF NOT EXISTS idx_faith_tx_user_ts ON faith_transactions(user_id, ts);
-        CREATE INDEX IF NOT EXISTS idx_tasks_tool_session ON tasks(tool_session_id) WHERE tool_session_id IS NOT NULL;
-        CREATE INDEX IF NOT EXISTS idx_tasks_task_type ON tasks(user_id, task_type);
     ",
     )?;
 
@@ -124,15 +120,27 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
         "recurrence_kind",
         "TEXT NOT NULL DEFAULT 'none'",
     )?;
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_tasks_user_recurrence ON tasks(user_id, recurrence_kind) WHERE recurrence_kind != 'none';",
+    )?;
     ensure_column(conn, "tasks", "template_id", "TEXT")?;
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_tasks_template_id_date ON tasks(template_id, date) WHERE template_id IS NOT NULL;",
+    )?;
     ensure_column(
         conn,
         "tasks",
         "task_type",
         "TEXT NOT NULL DEFAULT 'daily'",
     )?;
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_tasks_task_type ON tasks(user_id, task_type);",
+    )?;
     ensure_column(conn, "tasks", "source_tool", "TEXT")?;
     ensure_column(conn, "tasks", "tool_session_id", "TEXT")?;
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_tasks_tool_session ON tasks(tool_session_id) WHERE tool_session_id IS NOT NULL;",
+    )?;
     ensure_column(
         conn,
         "daily_records",

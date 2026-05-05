@@ -176,7 +176,7 @@ src-tauri/src/
 │   └── task.rs              # Task 模型、枚举、calc_task_bonus
 ├── data/                    # 持久化层
 │   ├── mod.rs               # 导出 schema / repository / sqlite
-│   ├── schema.rs            # SQLite DDL + init_schema() + ensure_column() 增量迁移
+│   ├── schema.rs            # SQLite DDL + init_schema() + ensure_column() 增量迁移（索引紧跟列迁移）
 │   ├── repository.rs        # Repository Trait 定义（UserRepo, DailyRecordRepo, TaskRepo, FaithTransactionRepo, TaskSessionRepo）
 │   └── sqlite.rs            # rusqlite 实现：SqliteDb 结构体 + 全部 Repo 实现（~996 行）
 ├── application/             # 业务编排层

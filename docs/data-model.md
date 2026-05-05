@@ -259,19 +259,27 @@ CREATE INDEX IF NOT EXISTS idx_faith_tx_user_ts ON faith_transactions(user_id, t
 | daily_records | task_bonus_work | `INTEGER NOT NULL DEFAULT 0` | v2.1 |
 | daily_records | task_bonus_study | `INTEGER NOT NULL DEFAULT 0` | v2.1 |
 
-### 3.3 增量索引
+### 3.3 索引与迁移顺序
+
+**关键约束**：引用增量迁移字段的索引必须在对应 `ensure_column()` 之后创建，否则旧数据库迁移时列不存在导致初始化崩溃。
+
+**基础索引**（依赖 CREATE TABLE 已定义的列，在 init_schema 中直接创建）：
 
 ```sql
--- init_schema 末尾补充
-CREATE INDEX IF NOT EXISTS idx_tasks_user_recurrence_kind
-    ON tasks(user_id, recurrence_kind) WHERE recurrence_kind != 'none';
-CREATE INDEX IF NOT EXISTS idx_tasks_template_id_date
-    ON tasks(template_id, date) WHERE template_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_tasks_tool_session
-    ON tasks(tool_session_id) WHERE tool_session_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_tasks_task_type
-    ON tasks(user_id, task_type);
+CREATE INDEX IF NOT EXISTS idx_daily_user_date ON daily_records(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_tasks_user_status ON tasks(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_task_sessions_task_id ON task_sessions(task_id);
+CREATE INDEX IF NOT EXISTS idx_faith_tx_user_ts ON faith_transactions(user_id, ts);
 ```
+
+**增量索引**（紧跟对应 `ensure_column()` 之后创建）：
+
+| 索引名 | 依赖列 | 创建位置 |
+|--------|--------|----------|
+| `idx_tasks_user_recurrence` | `tasks.recurrence_kind` | `ensure_column("recurrence_kind")` 之后 |
+| `idx_tasks_template_id_date` | `tasks.template_id` | `ensure_column("template_id")` 之后 |
+| `idx_tasks_task_type` | `tasks.task_type` | `ensure_column("task_type")` 之后 |
+| `idx_tasks_tool_session` | `tasks.tool_session_id` | `ensure_column("tool_session_id")` 之后 |
 
 ## 4. Rust ↔ TypeScript 类型映射
 
