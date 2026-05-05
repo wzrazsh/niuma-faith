@@ -26,7 +26,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   async function updateTask(id: string, fields: Record<string, any>) {
-    const task = await api.invoke_update_task(id, fields.title, fields.description, fields.estimatedMinutes, fields.actualMinutes, fields.notes, fields.status);
+    const task = await api.invoke_update_task(id, fields.title, fields.description, fields.category, fields.estimated_minutes, fields.actual_minutes, fields.notes, fields.status);
     const idx = tasks.value.findIndex(t => t.id === id);
     if (idx !== -1) tasks.value[idx] = task;
     return task;

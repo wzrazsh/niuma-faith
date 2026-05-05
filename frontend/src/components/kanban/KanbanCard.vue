@@ -1,6 +1,6 @@
 <template>
   <div class="card" draggable="true" @dragstart="onDragStart"
-    @click="$emit('edit', card.taskId)">
+    @dblclick="$emit('edit', card.taskId)">
     <div class="card-info">
       <span class="card-title">{{ cardTitle }}</span>
       <span v-if="cardDetail" class="card-category" :class="cardDetail.category">

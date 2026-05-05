@@ -262,6 +262,7 @@ export const handlers: MockHandlers = {
     if (t.task_type === 'project') throw 'project task cannot be modified via UI';
     if (args.title !== undefined) t.title = args.title;
     if (args.description !== undefined) t.description = args.description;
+    if (args.category !== undefined) t.category = args.category;
     if (args.estimatedMinutes !== undefined) {
       if (args.estimatedMinutes <= 0) throw 'estimated_minutes must be > 0';
       t.estimated_minutes = args.estimatedMinutes;
@@ -449,12 +450,17 @@ export const handlers: MockHandlers = {
 };
 
 export async function safeInvoke<T>(command: string, args: Record<string, any> = {}): Promise<T> {
-  if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-    const { invoke } = await import('@tauri-apps/api/core');
-    return invoke(command, args);
+  try {
+    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+      const { invoke } = await import('@tauri-apps/api/core');
+      return await invoke(command, args);
+    }
+    if (handlers[command]) {
+      return await handlers[command](args) as T;
+    }
+    throw new Error(`Unknown command: ${command}`);
+  } catch (e: any) {
+    console.error(`[safeInvoke] ${command} failed:`, typeof e === 'string' ? e : e?.message || e);
+    throw e;
   }
-  if (handlers[command]) {
-    return handlers[command](args) as T;
-  }
-  throw new Error(`Unknown command: ${command}`);
 }

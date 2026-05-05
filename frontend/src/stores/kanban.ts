@@ -54,23 +54,41 @@ export const useKanbanStore = defineStore('kanban', () => {
 
   async function loadBoard() {
     isLoading.value = true;
-    const config = loadConfig();
-    columns.value = config.columns;
-    const taskStore = useTaskStore();
-    await taskStore.loadTasksByDate(new Date().toISOString().slice(0, 10));
-    cards.value.clear();
-    for (const col of columns.value) {
-      col.taskIds = [];
-    }
-    for (const task of taskStore.tasks) {
-      const colId = mapStatusToColumn(task.status);
-      const col = columns.value.find(c => c.id === colId);
-      if (col) {
-        col.taskIds.push(task.id);
-        cards.value.set(task.id, { taskId: task.id, columnId: colId, orderInColumn: col.taskIds.length - 1 });
+    try {
+      const config = loadConfig();
+      columns.value = config.columns;
+      const taskStore = useTaskStore();
+      await taskStore.loadTasksByDate(new Date().toISOString().slice(0, 10));
+
+      const existingTaskIds = new Set<string>();
+      for (const col of columns.value) {
+        for (const id of col.taskIds) {
+          existingTaskIds.add(id);
+        }
       }
+
+      cards.value.clear();
+      for (const col of columns.value) {
+        col.taskIds = col.taskIds.filter(id => taskStore.tasks.some(t => t.id === id));
+        for (let i = 0; i < col.taskIds.length; i++) {
+          const id = col.taskIds[i];
+          cards.value.set(id, { taskId: id, columnId: col.id, orderInColumn: i });
+        }
+      }
+
+      for (const task of taskStore.tasks) {
+        if (existingTaskIds.has(task.id)) continue;
+        const colId = mapStatusToColumn(task.status);
+        const col = columns.value.find(c => c.id === colId);
+        if (col) {
+          col.taskIds.push(task.id);
+          cards.value.set(task.id, { taskId: task.id, columnId: colId, orderInColumn: col.taskIds.length - 1 });
+        }
+      }
+      saveConfig({ columns: columns.value });
+    } catch (e: any) {
+      console.error('[kanban] loadBoard failed:', e);
     }
-    saveConfig({ columns: columns.value });
     isLoading.value = false;
   }
 
@@ -156,6 +174,7 @@ export const useKanbanStore = defineStore('kanban', () => {
     activeTimers.value.forEach((_, key) => stopTimer(key));
     columns.value = DEFAULT_COLUMNS.map(c => ({ ...c, taskIds: [...c.taskIds] }));
     saveConfig({ columns: columns.value });
+    loadBoard();
   }
 
   return { columns, cards, activeTimers, isLoading, taskMap, columnCards, columnSwimlanes, loadBoard, moveCard, addCard, startTimer, stopTimer, addColumn, removeColumn, resetToDefault };

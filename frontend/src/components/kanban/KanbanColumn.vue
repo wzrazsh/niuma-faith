@@ -17,7 +17,7 @@
           <span class="swimlane-label">{{ group.label }}</span>
           <span class="swimlane-count">{{ group.cards.length }}</span>
         </div>
-        <KanbanCard v-for="card in group.cards" :key="card.taskId" :card="card" :column-id="column.id" />
+        <KanbanCard v-for="card in group.cards" :key="card.taskId" :card="card" :column-id="column.id" @edit="id => $emit('edit', id)" />
       </div>
     </div>
     <KanbanCardForm v-if="showForm" :column-id="column.id" @close="showForm = false" @created="showForm = false" :key="'form-' + Date.now()" />

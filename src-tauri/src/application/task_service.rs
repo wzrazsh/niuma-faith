@@ -132,6 +132,7 @@ impl TaskService {
 
     pub fn update_task(
         &self, id: &str, title: Option<&str>, description: Option<&str>,
+        category: Option<&str>,
         estimated_minutes: Option<i32>, actual_minutes: Option<i32>,
         notes: Option<&str>, status: Option<&str>,
     ) -> Result<Task, String> {
@@ -147,6 +148,14 @@ impl TaskService {
         let now = Self::now_str();
         if let Some(t) = title { task.title = t.to_string(); }
         if let Some(d) = description { task.description = d.to_string(); }
+        if let Some(c) = category {
+            task.category = match c {
+                "work" => TaskCategory::Work,
+                "study" => TaskCategory::Study,
+                "other" => TaskCategory::Other,
+                _ => return Err("invalid category".into()),
+            };
+        }
         if let Some(e) = estimated_minutes {
             if e <= 0 { return Err("estimated_minutes must be > 0".into()); }
             task.estimated_minutes = e;

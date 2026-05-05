@@ -12,17 +12,28 @@
       </div>
     </div>
     <div class="board-columns">
-      <KanbanColumn v-for="col in kanban.columns" :key="col.id" :column="col" />
+      <KanbanColumn v-for="col in kanban.columns" :key="col.id" :column="col" @edit="onEdit" />
     </div>
+    <TaskDetailModal v-if="editingTaskId" :task-id="editingTaskId" @close="editingTaskId = null" @saved="onSaved" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useKanbanStore } from '@/stores/kanban';
 import KanbanColumn from './KanbanColumn.vue';
+import TaskDetailModal from './TaskDetailModal.vue';
 
 const kanban = useKanbanStore();
+const editingTaskId = ref<string | null>(null);
+
+function onEdit(taskId: string) {
+  editingTaskId.value = taskId;
+}
+
+async function onSaved() {
+  await kanban.loadBoard();
+}
 
 onMounted(() => {
   kanban.loadBoard();
