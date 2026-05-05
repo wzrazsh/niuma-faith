@@ -28,7 +28,7 @@ const taskStore = useTaskStore();
 const taskId = ref('');
 
 const availableTasks = computed(() => {
-  return taskStore.tasks.filter(t => !kanban.cards.find(c => c.taskId === t.id));
+  return taskStore.tasks.filter(t => !kanban.cards.has(t.id));
 });
 
 function submit() {

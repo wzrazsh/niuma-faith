@@ -6,19 +6,26 @@
     <div class="column-header">
       <div class="column-info">
         <span class="column-title">{{ column.title }}</span>
-        <span class="column-count">{{ kanban.columnCards(column.id).length }}</span>
+        <span class="column-count">{{ totalCards }}</span>
       </div>
       <button class="column-add" :title="'添加到 ' + column.title" @click="showForm = true">+</button>
     </div>
     <div class="column-cards">
-      <KanbanCard v-for="card in kanban.columnCards(column.id)" :key="card.id" :card="card" :column-id="column.id" />
+      <div v-for="group in kanban.columnSwimlanes(column.id)" :key="column.id + '-' + group.categoryId" class="swimlane">
+        <div class="swimlane-header">
+          <span class="swimlane-dot" :class="group.categoryId"></span>
+          <span class="swimlane-label">{{ group.label }}</span>
+          <span class="swimlane-count">{{ group.cards.length }}</span>
+        </div>
+        <KanbanCard v-for="card in group.cards" :key="card.taskId" :card="card" :column-id="column.id" />
+      </div>
     </div>
     <KanbanCardForm v-if="showForm" :column-id="column.id" @close="showForm = false" @created="showForm = false" :key="'form-' + Date.now()" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useKanbanStore } from '@/stores/kanban';
 import KanbanCard from './KanbanCard.vue';
 import KanbanCardForm from './KanbanCardForm.vue';
@@ -28,10 +35,18 @@ const kanban = useKanbanStore();
 const dragOver = ref(false);
 const showForm = ref(false);
 
+const totalCards = computed(() => {
+  return kanban.columnCards(props.column.id).length;
+});
+
 function onDrop(e: DragEvent) {
   dragOver.value = false;
   const cardId = e.dataTransfer?.getData('text/plain');
-  if (cardId) kanban.moveCard(cardId, props.column.id);
+  if (cardId) {
+    const col = kanban.columns.find(c => c.id === props.column.id);
+    const targetIndex = col ? col.taskIds.length : 0;
+    kanban.moveCard(cardId, props.column.id, targetIndex);
+  }
 }
 </script>
 
@@ -105,8 +120,46 @@ function onDrop(e: DragEvent) {
 .column-cards {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding: 0 10px 10px;
   flex: 1;
+}
+
+.swimlane {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.swimlane-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 2px;
+}
+
+.swimlane-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.swimlane-dot.work { background: var(--color-work); }
+.swimlane-dot.study { background: var(--color-study); }
+.swimlane-dot.other { background: var(--color-other); }
+
+.swimlane-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.swimlane-count {
+  font-size: 0.62rem;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+  font-family: var(--font-mono);
 }
 </style>

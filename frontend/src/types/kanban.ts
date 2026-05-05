@@ -23,6 +23,12 @@ export interface KanbanCard {
   };
 }
 
+export interface SwimlaneGroup {
+  categoryId: string;
+  label: string;
+  cards: KanbanCard[];
+}
+
 export interface BoardConfig {
   columns: KanbanColumn[];
 }

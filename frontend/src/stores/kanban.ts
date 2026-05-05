@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import type { KanbanColumn, KanbanCard, BoardConfig } from '@/types/kanban';
+import { ref, computed } from 'vue';
+import type { KanbanColumn, KanbanCard, BoardConfig, SwimlaneGroup } from '@/types/kanban';
 import type { Task } from '@/types';
 import { useTaskStore } from './task';
 
@@ -9,6 +9,12 @@ const DEFAULT_COLUMNS: KanbanColumn[] = [
   { id: 'inprogress', title: '进行中', order: 1, taskIds: [], isCustom: false },
   { id: 'paused', title: '暂停中', order: 2, taskIds: [], isCustom: false },
   { id: 'done', title: '已完成', order: 3, taskIds: [], isCustom: false },
+];
+
+const SWIMLANE_CATEGORIES: { id: string; label: string }[] = [
+  { id: 'work', label: '工作' },
+  { id: 'study', label: '学习' },
+  { id: 'other', label: '其他' },
 ];
 
 function loadConfig(): BoardConfig {
@@ -26,6 +32,15 @@ export const useKanbanStore = defineStore('kanban', () => {
   const cards = ref<Map<string, KanbanCard>>(new Map());
   const activeTimers = ref<Map<string, number>>(new Map());
   const isLoading = ref(false);
+
+  const taskMap = computed(() => {
+    const taskStore = useTaskStore();
+    const map: Record<string, Task> = {};
+    for (const t of taskStore.tasks) {
+      map[t.id] = t;
+    }
+    return map;
+  });
 
   function mapStatusToColumn(status: string): string {
     switch (status) {
@@ -59,6 +74,29 @@ export const useKanbanStore = defineStore('kanban', () => {
     isLoading.value = false;
   }
 
+  function columnCards(columnId: string): KanbanCard[] {
+    const col = columns.value.find(c => c.id === columnId);
+    if (!col) return [];
+    return col.taskIds.map(id => cards.value.get(id)).filter(Boolean) as KanbanCard[];
+  }
+
+  function columnSwimlanes(columnId: string): SwimlaneGroup[] {
+    const tasks = columnCards(columnId);
+    const taskStore = useTaskStore();
+    const groups: SwimlaneGroup[] = SWIMLANE_CATEGORIES.map(cat => ({
+      categoryId: cat.id,
+      label: cat.label,
+      cards: [],
+    }));
+    for (const card of tasks) {
+      const task = taskStore.tasks.find(t => t.id === card.taskId);
+      if (!task) continue;
+      const group = groups.find(g => g.categoryId === task.category);
+      if (group) group.cards.push(card);
+    }
+    return groups.filter(g => g.cards.length > 0);
+  }
+
   function moveCard(cardId: string, targetColumnId: string, targetIndex: number) {
     const card = cards.value.get(cardId);
     if (!card) return;
@@ -69,6 +107,15 @@ export const useKanbanStore = defineStore('kanban', () => {
     targetCol.taskIds.splice(targetIndex, 0, cardId);
     card.columnId = targetColumnId;
     cards.value.set(cardId, card);
+    saveConfig({ columns: columns.value });
+  }
+
+  function addCard(columnId: string, taskId: string) {
+    const col = columns.value.find(c => c.id === columnId);
+    if (!col) return;
+    if (col.taskIds.includes(taskId)) return;
+    col.taskIds.push(taskId);
+    cards.value.set(taskId, { taskId, columnId, orderInColumn: col.taskIds.length - 1 });
     saveConfig({ columns: columns.value });
   }
 
@@ -104,5 +151,12 @@ export const useKanbanStore = defineStore('kanban', () => {
     }
   }
 
-  return { columns, cards, activeTimers, isLoading, loadBoard, moveCard, startTimer, stopTimer, addColumn, removeColumn };
+  function resetToDefault() {
+    cards.value.clear();
+    activeTimers.value.forEach((_, key) => stopTimer(key));
+    columns.value = DEFAULT_COLUMNS.map(c => ({ ...c, taskIds: [...c.taskIds] }));
+    saveConfig({ columns: columns.value });
+  }
+
+  return { columns, cards, activeTimers, isLoading, taskMap, columnCards, columnSwimlanes, loadBoard, moveCard, addCard, startTimer, stopTimer, addColumn, removeColumn, resetToDefault };
 });

@@ -3,7 +3,7 @@
     <div class="board-header">
       <div class="board-title">任务看板</div>
       <div class="board-actions">
-        <button @click="kanban.addColumn">
+        <button @click="kanban.addColumn('新列')">
           <span class="btn-icon">+</span> 添加列
         </button>
         <button @click="kanban.resetToDefault">
@@ -18,10 +18,15 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { useKanbanStore } from '@/stores/kanban';
 import KanbanColumn from './KanbanColumn.vue';
 
 const kanban = useKanbanStore();
+
+onMounted(() => {
+  kanban.loadBoard();
+});
 </script>
 
 <style scoped>

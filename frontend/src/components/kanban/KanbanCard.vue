@@ -1,6 +1,6 @@
 <template>
   <div class="card" draggable="true" @dragstart="onDragStart"
-    @click="$emit('edit', card.id)">
+    @click="$emit('edit', card.taskId)">
     <div class="card-info">
       <span class="card-title">{{ cardTitle }}</span>
       <span v-if="cardDetail" class="card-category" :class="cardDetail.category">
@@ -32,11 +32,11 @@ const cardDetail = computed(() => {
 });
 
 const timerRunning = computed(() => {
-  return kanban.activeTimers[props.card.taskId] === true;
+  return kanban.activeTimers.has(props.card.taskId);
 });
 
 function onDragStart(e: DragEvent) {
-  e.dataTransfer?.setData('text/plain', props.card.id);
+  e.dataTransfer?.setData('text/plain', props.card.taskId);
 }
 </script>
 
