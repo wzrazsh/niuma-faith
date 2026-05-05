@@ -1,60 +1,107 @@
 <template>
-  <div
-    v-if="task"
-    class="kanban-card"
-    draggable="true"
-    @dragstart="onDragStart"
-  >
-    <div class="card-title">{{ task.title }}</div>
-    <div class="card-meta">{{ task.category }} | 预计 {{ task.estimated_minutes }}分钟</div>
-    <div v-if="task.status === 'running'" class="card-timer">计时中: {{ formatDuration(task.duration_seconds) }}</div>
-    <div class="card-actions" v-if="task.status !== 'completed' && task.status !== 'abandoned'">
-      <button v-if="task.status === 'paused'" class="primary" @click="doStart">开始</button>
-      <button v-if="task.status === 'running'" @click="doPause">暂停</button>
-      <button v-if="task.status === 'running'" class="success" @click="doComplete">完成</button>
-      <button v-if="task.status === 'running'" class="danger" @click="doAbandon">放弃</button>
-      <button v-if="task.status === 'paused'" class="success" @click="doResume">继续</button>
+  <div class="card" draggable="true" @dragstart="onDragStart"
+    @click="$emit('edit', card.id)">
+    <div class="card-info">
+      <span class="card-title">{{ cardTitle }}</span>
+      <span v-if="cardDetail" class="card-category" :class="cardDetail.category">
+        {{ cardDetail.category }}
+      </span>
     </div>
-    <div v-if="card.processBinding" class="card-binding">📎 {{ card.processBinding.appName }}</div>
+    <div v-if="timerRunning" class="card-timer">
+      <span class="timer-dot"></span>
+      <span>进行中</span>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue';
-import type { KanbanCard } from '@/types/kanban';
-import { useTaskStore } from '@/stores/task';
-import { useFaithStore } from '@/stores/faith';
-import { formatDuration } from '@/utils/format';
+import { computed } from 'vue';
+import { useKanbanStore } from '@/stores/kanban';
 
-const props = defineProps<{ card: KanbanCard; index?: number }>();
-const emit = defineEmits<{ dragStart: [cardId: string] }>();
+const props = defineProps<{ card: any; columnId: string }>();
+defineEmits<{ edit: [id: string] }>();
+const kanban = useKanbanStore();
 
-const taskStore = useTaskStore();
-const faith = useFaithStore();
+const cardTitle = computed(() => {
+  const task = kanban.taskMap[props.card.taskId];
+  return task ? task.title : '加载中...';
+});
 
-const task = computed(() => taskStore.tasks.find(t => t.id === props.card.taskId));
+const cardDetail = computed(() => {
+  return kanban.taskMap[props.card.taskId] || null;
+});
 
-async function doStart() { await taskStore.startTask(props.card.taskId); await faith.refreshStatus(); }
-async function doPause() { await taskStore.pauseTask(props.card.taskId); await faith.refreshStatus(); }
-async function doResume() { await taskStore.resumeTask(props.card.taskId); await faith.refreshStatus(); }
-async function doComplete() {
-  const mins = prompt('实际用时(分钟):', String(task.value?.estimated_minutes ?? 30));
-  if (mins) { await taskStore.completeTask(props.card.taskId, parseInt(mins)); await faith.refreshStatus(); }
-}
-async function doAbandon() { await taskStore.abandonTask(props.card.taskId); await faith.refreshStatus(); }
+const timerRunning = computed(() => {
+  return kanban.activeTimers[props.card.taskId] === true;
+});
 
 function onDragStart(e: DragEvent) {
-  e.dataTransfer?.setData('text/plain', props.card.taskId);
-  emit('dragStart', props.card.taskId);
+  e.dataTransfer?.setData('text/plain', props.card.id);
 }
 </script>
 
 <style scoped>
-.kanban-card { background: var(--color-surface); border-radius: 6px; padding: 8px 10px; cursor: grab; border: 1px solid var(--color-border); }
-.kanban-card:hover { border-color: var(--color-primary); }
-.card-title { font-weight: 500; font-size: 0.85rem; margin-bottom: 4px; }
-.card-meta { font-size: 0.7rem; color: var(--color-text-muted); }
-.card-timer { font-size: 0.7rem; color: var(--color-success); margin-top: 4px; }
-.card-actions { display: flex; gap: 4px; margin-top: 6px; }
-.card-binding { font-size: 0.7rem; color: var(--color-primary-dim); margin-top: 4px; }
+.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card:hover {
+  border-color: var(--color-border);
+  background: var(--color-bg-alt);
+  transform: translateX(2px);
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.4;
+}
+
+.card-category {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  align-self: flex-start;
+}
+
+.card-category.work { background: rgba(251, 114, 133, 0.15); color: var(--color-work); }
+.card-category.study { background: rgba(96, 165, 250, 0.15); color: var(--color-study); }
+.card-category.other { background: rgba(167, 139, 250, 0.15); color: var(--color-other); }
+
+.card-timer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  color: var(--color-primary);
+}
+
+.timer-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  animation: glow-pulse 1.5s ease-in-out infinite;
+}
 </style>

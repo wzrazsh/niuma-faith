@@ -1,69 +1,112 @@
 <template>
-  <div
-    class="kanban-column"
-    @dragover.prevent
-    @drop.prevent="onDrop"
-    :class="{ 'drag-over': isDragOver }"
-    @dragenter.prevent="isDragOver = true"
-    @dragleave.prevent="isDragOver = false"
-  >
-    <div class="col-header">
-      <span class="col-title">{{ column.title }}</span>
-      <span class="col-count">{{ cards.length }}</span>
-      <div class="col-actions">
-        <button @click="$emit('addCard')">+</button>
-        <button v-if="column.isCustom" class="danger" @click="$emit('deleteColumn')">×</button>
+  <div class="column" :class="{ dragging: dragOver }"
+    @dragover.prevent="dragOver = true"
+    @dragleave="dragOver = false"
+    @drop="onDrop">
+    <div class="column-header">
+      <div class="column-info">
+        <span class="column-title">{{ column.title }}</span>
+        <span class="column-count">{{ kanban.columnCards(column.id).length }}</span>
       </div>
+      <button class="column-add" :title="'添加到 ' + column.title" @click="showForm = true">+</button>
     </div>
-    <div class="col-cards">
-      <KanbanCard
-        v-for="(card, idx) in sortedCards"
-        :key="card.taskId"
-        :card="card"
-        :index="idx"
-        @drag-start="onDragStart"
-      />
-      <div v-if="cards.length === 0" class="empty">暂无任务</div>
+    <div class="column-cards">
+      <KanbanCard v-for="card in kanban.columnCards(column.id)" :key="card.id" :card="card" :column-id="column.id" />
     </div>
+    <KanbanCardForm v-if="showForm" :column-id="column.id" @close="showForm = false" @created="showForm = false" :key="'form-' + Date.now()" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import type { KanbanColumn, KanbanCard as KanbanCardType } from '@/types/kanban';
+import { ref } from 'vue';
+import { useKanbanStore } from '@/stores/kanban';
 import KanbanCard from './KanbanCard.vue';
+import KanbanCardForm from './KanbanCardForm.vue';
 
-const props = defineProps<{ column: KanbanColumn; cards: KanbanCardType[] }>();
-const emit = defineEmits<{ drop: [columnId: string, index: number]; addCard: []; deleteColumn: [] }>();
-
-const isDragOver = ref(false);
-
-const sortedCards = computed(() => [...props.cards].sort((a, b) => a.orderInColumn - b.orderInColumn));
+const props = defineProps<{ column: any }>();
+const kanban = useKanbanStore();
+const dragOver = ref(false);
+const showForm = ref(false);
 
 function onDrop(e: DragEvent) {
-  isDragOver.value = false;
+  dragOver.value = false;
   const cardId = e.dataTransfer?.getData('text/plain');
-  if (!cardId) return;
-  const idx = getDropIndex(e);
-  emit('drop', props.column.id, idx);
-}
-
-function onDragStart(cardId: string) {
-  // handled in parent
-}
-
-function getDropIndex(e: DragEvent): number {
-  return sortedCards.value.length;
+  if (cardId) kanban.moveCard(cardId, props.column.id);
 }
 </script>
 
 <style scoped>
-.kanban-column { min-width: 280px; max-width: 280px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; }
-.kanban-column.drag-over { border-color: var(--color-primary); }
-.col-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border); }
-.col-title { font-weight: 600; }
-.col-count { font-size: 0.75rem; color: var(--color-text-muted); background: var(--color-surface); padding: 1px 6px; border-radius: 10px; }
-.col-actions { margin-left: auto; display: flex; gap: 4px; }
-.col-cards { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
-.empty { text-align: center; color: var(--color-text-muted); padding: 16px; font-size: 0.85rem; }
+.column {
+  min-width: 260px;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.column.dragging {
+  border-color: var(--color-primary);
+  background: var(--color-primary-glow);
+}
+
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 14px 0;
+}
+
+.column-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.column-title {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.column-count {
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+}
+
+.column-add {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: 50%;
+  font-size: 1.1rem;
+}
+
+.column-add:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-primary);
+  transform: none;
+}
+
+.column-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px 10px;
+  flex: 1;
+}
 </style>

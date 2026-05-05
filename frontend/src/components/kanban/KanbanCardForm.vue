@@ -1,68 +1,91 @@
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal">
-      <div class="modal-header">
-        <span>编辑任务</span>
-        <button @click="$emit('close')">×</button>
+  <div class="overlay" @click.self="$emit('close')">
+    <div class="form-panel" @click.stop>
+      <div class="form-title">添加卡片</div>
+      <div class="form-field">
+        <label>关联任务</label>
+        <select v-model="taskId">
+          <option v-for="t in availableTasks" :key="t.id" :value="t.id">{{ t.title }}</option>
+        </select>
       </div>
-      <div class="modal-body">
-        <input v-model="title" placeholder="标题" />
-        <div class="field-row">
-          <select v-model="category">
-            <option value="work">work</option>
-            <option value="study">study</option>
-            <option value="other">other</option>
-          </select>
-          <input v-model.number="estimated" type="number" placeholder="预计(分钟)" />
-        </div>
-        <div class="binding-section">
-          <div class="section-title">进程绑定</div>
-          <input v-model="appName" placeholder="应用名 (如 notepad.exe)" />
-          <label class="checkbox"><input type="checkbox" v-model="autoStart" /> 启动时自动开始</label>
-          <label class="checkbox"><input type="checkbox" v-model="autoPause" /> 结束时自动暂停</label>
-        </div>
-      </div>
-      <div class="modal-footer">
+      <div class="form-actions">
         <button @click="$emit('close')">取消</button>
-        <button class="primary" @click="save">保存</button>
+        <button class="primary" @click="submit">添加</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { useKanbanStore } from '@/stores/kanban';
 import { useTaskStore } from '@/stores/task';
 
-const emit = defineEmits<{ close: [] }>();
-const props = defineProps<{ taskId?: string }>();
-
+const props = defineProps<{ columnId: string }>();
+const emit = defineEmits<{ close: []; created: [] }>();
+const kanban = useKanbanStore();
 const taskStore = useTaskStore();
-const title = ref('');
-const category = ref('work');
-const estimated = ref(30);
-const appName = ref('');
-const autoStart = ref(false);
-const autoPause = ref(false);
+const taskId = ref('');
 
-async function save() {
-  if (!title.value.trim()) return;
-  if (props.taskId) {
-    await taskStore.updateTask(props.taskId, { title: title.value, estimatedMinutes: estimated.value });
-  }
+const availableTasks = computed(() => {
+  return taskStore.tasks.filter(t => !kanban.cards.find(c => c.taskId === t.id));
+});
+
+function submit() {
+  if (!taskId.value) return;
+  kanban.addCard(props.columnId, taskId.value);
+  emit('created');
   emit('close');
 }
 </script>
 
 <style scoped>
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
-.modal { background: var(--color-surface); border-radius: 8px; width: 420px; }
-.modal-header { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
-.modal-body { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
-.modal-footer { padding: 12px 16px; border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; gap: 8px; }
-.field-row { display: flex; gap: 8px; }
-.field-row input { width: 100%; }
-.binding-section { border: 1px solid var(--color-border); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
-.section-title { font-size: 0.8rem; color: var(--color-text-muted); }
-.checkbox { font-size: 0.8rem; display: flex; align-items: center; gap: 4px; }
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 8, 16, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.form-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  width: 360px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: fade-slide-up 0.2s ease;
+}
+
+.form-title {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-field label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
 </style>

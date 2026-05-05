@@ -6,7 +6,7 @@
       <FaithDashboard />
       <DailyGoalPanel />
     </aside>
-    <main class="main-area">
+    <main class="main">
       <TaskList />
     </main>
   </div>
@@ -14,20 +14,49 @@
 
 <script setup lang="ts">
 import CalendarView from './CalendarView.vue';
-import FaithDashboard from './FaithDashboard.vue';
 import StatusPanel from './StatusPanel.vue';
+import FaithDashboard from './FaithDashboard.vue';
 import DailyGoalPanel from './DailyGoalPanel.vue';
 import TaskList from './TaskList.vue';
 import { useTaskStore } from '@/stores/task';
 
+const task = useTaskStore();
 function onDateSelect(date: string) {
-  const task = useTaskStore();
-  task.loadTasksByDate(date);
+  task.selectedDate = date;
 }
 </script>
 
 <style scoped>
-.dashboard { display: flex; height: calc(100vh - 42px); }
-.sidebar { width: 320px; border-right: 1px solid var(--color-border); overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
-.main-area { flex: 1; overflow-y: auto; padding: 12px; }
+.dashboard {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  height: calc(100vh - 44px);
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 3px;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.main::-webkit-scrollbar {
+  width: 3px;
+}
 </style>

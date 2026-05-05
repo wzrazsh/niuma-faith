@@ -1,64 +1,78 @@
 <template>
-  <div class="kanban-board">
+  <div class="board">
     <div class="board-header">
-      <h2>任务看板</h2>
-      <button class="primary" @click="addCol">+ 添加列</button>
+      <div class="board-title">任务看板</div>
+      <div class="board-actions">
+        <button @click="kanban.addColumn">
+          <span class="btn-icon">+</span> 添加列
+        </button>
+        <button @click="kanban.resetToDefault">
+          重置默认
+        </button>
+      </div>
     </div>
-    <div class="board-columns" v-if="!kanban.isLoading">
-      <KanbanColumn
-        v-for="col in kanban.columns"
-        :key="col.id"
-        :column="col"
-        :cards="getColumnCards(col.id)"
-        @drop="onDrop"
-        @add-card="addCard(col.id)"
-        @delete-column="kanban.removeColumn(col.id)"
-      />
+    <div class="board-columns">
+      <KanbanColumn v-for="col in kanban.columns" :key="col.id" :column="col" />
     </div>
-    <div v-else class="loading">加载中...</div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
 import { useKanbanStore } from '@/stores/kanban';
-import type { KanbanCard } from '@/types/kanban';
 import KanbanColumn from './KanbanColumn.vue';
 
 const kanban = useKanbanStore();
-
-onMounted(() => { kanban.loadBoard(); });
-
-function getColumnCards(colId: string): KanbanCard[] {
-  const ret: KanbanCard[] = [];
-  for (const [_, card] of kanban.cards) {
-    if (card.columnId === colId) ret.push(card);
-  }
-  return ret;
-}
-
-let draggedCardId: string | null = null;
-
-function onDragStart(cardId: string) { draggedCardId = cardId; }
-
-function onDrop(targetColumnId: string, targetIndex: number) {
-  if (!draggedCardId) return;
-  kanban.moveCard(draggedCardId, targetColumnId, targetIndex);
-  draggedCardId = null;
-}
-
-function addCard(columnId: string) { /* Open card form - simplified */ }
-
-async function addCol() {
-  const name = prompt('列名:');
-  if (name) kanban.addColumn(name);
-}
 </script>
 
 <style scoped>
-.kanban-board { padding: 16px; height: 100%; }
-.board-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.board-header h2 { font-size: 1.2rem; }
-.board-columns { display: flex; gap: 12px; overflow-x: auto; height: calc(100vh - 100px); }
-.loading { text-align: center; color: var(--color-text-muted); padding: 24px; }
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.board-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.board-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.board-actions button {
+  font-size: 0.78rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  padding: 6px 12px;
+}
+
+.board-actions button:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.btn-icon {
+  font-size: 0.85rem;
+}
+
+.board-columns {
+  display: flex;
+  gap: 14px;
+  flex: 1;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
 </style>
