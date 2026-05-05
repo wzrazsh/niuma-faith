@@ -519,7 +519,7 @@ interface DailyStats {
 
 #### `open_floating_widget`
 
-打开/显示悬浮窗（80×80，置顶，无边框，透明）。
+打开/显示悬浮窗（80×80，置顶，无边框，透明）。悬浮窗不存在时自动创建（`inner_size: 80×80`, `always_on_top: true`, `decorations: false`, `skip_taskbar: true`, `transparent: true`, `shadow: false`, `resizable: false`）。
 
 ```typescript
 // Request
@@ -545,7 +545,7 @@ invoke("close_floating_widget")
 
 #### `show_main_window`
 
-显示/还原主窗口。
+显示/还原主窗口。主窗口不存在时自动创建（`inner_size: 900×700`）。
 
 ```typescript
 // Request

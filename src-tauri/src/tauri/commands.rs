@@ -1,5 +1,4 @@
-use tauri::State;
-use tauri::Manager;
+use tauri::{Manager, PhysicalSize, State, WebviewUrl, WebviewWindowBuilder};
 use crate::domain::models::*;
 use crate::domain::task::*;
 use crate::data::repository::DailyRecordRepo;
@@ -235,9 +234,22 @@ pub async fn get_project_tasks(
 #[tauri::command]
 pub async fn open_floating_widget(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("floating") {
-        window.show().map_err(|e| e.to_string())?;
+        let _ = window.show();
         window.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
     }
+    let window = WebviewWindowBuilder::new(&app, "floating", WebviewUrl::App("/#/floating".into()))
+        .title("牛马信仰 悬浮")
+        .inner_size(80.0, 80.0)
+        .resizable(false)
+        .always_on_top(true)
+        .decorations(false)
+        .skip_taskbar(true)
+        .transparent(true)
+        .shadow(false)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let _ = window.set_size(PhysicalSize::new(80u32, 80u32));
     Ok(())
 }
 
@@ -252,8 +264,15 @@ pub async fn close_floating_widget(app: tauri::AppHandle) -> Result<(), String> 
 #[tauri::command]
 pub async fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
-        window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    } else {
+        WebviewWindowBuilder::new(&app, "main", WebviewUrl::App("/".into()))
+            .title("牛马信仰")
+            .inner_size(900.0, 700.0)
+            .build()
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
