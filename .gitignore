@@ -3,3 +3,8 @@ node_modules
 src-tauri/target
 frontend/dist
 test-results
+.tauri-qa
+e2e
+playwright.config.ts
+compare-images.ps1
+compare-screenshots.ps1
