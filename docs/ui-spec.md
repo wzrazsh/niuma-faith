@@ -7,53 +7,132 @@
 ```
 /           → Dashboard.vue      (主仪表盘)
 /kanban     → KanbanPage.vue     (任务看板)
-/floating   → FloatingWidget.vue (悬浮窗，无边框)
+/floating   → FloatingWidget.vue (悬浮窗，无边框透明)
 *           → 重定向到 /
 ```
 
 路由模式：Hash 模式 (`createWebHashHistory`)
+
+> **更新日期**: 2026-05-06 — 全组件设计大修，暗金主题 v2。CSS 选择器变更汇总见附录 A。
 
 ## 2. 全局布局
 
 ### 2.1 App.vue（根组件）
 
 ```
-┌─────────────────────────────────────────┐
-│  <nav> 仪表盘 | 任务看板                 │  ← 仅在非 /floating 路由显示
-├─────────────────────────────────────────┤
-│                                         │
-│           <router-view />               │
-│                                         │
-└─────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│  ✦ 牛马信仰       ◈ 仪表盘   ▣ 任务看板                 │  ← nav-bar，仅在非 /floating 路由显示
+├────────────────────────────────────────────────────────┤
+│                                                        │
+│              <router-view />                           │
+│              (全屏填充)                                 │
+│                                                        │
+└────────────────────────────────────────────────────────┘
+```
+
+**nav-bar 结构**:
+```
+.nav-bar (44px 高度, position:relative, z-index:10)
+├── .nav-brand → .nav-logo (✦, 金色发光) + .nav-title (font-display, 0.95rem)
+├── .nav-links → router-link × 2 (仪表盘/任务看板，每项含图标+文本)
+└── .nav-glow (底部 1px 渐变金线)
 ```
 
 **导航栏样式**:
-- 背景: `var(--color-surface)` (#222233)
-- 底部边框: `1px solid var(--color-border)`
-- padding: `8px 16px`
-- 链接间距: `16px`
-- 链接样式: 圆角 6px, 字号 0.875rem, 颜色 `var(--color-text-muted)`
-- 悬停: 背景 `var(--color-bg)`, 颜色 `var(--color-text)`
-- 激活: 背景 `var(--color-primary)` (#ffd700), 颜色 `#1a1a24`, 字重 600
+- 背景: `var(--color-surface)` (#16162a)
+- 底部边框: `1px solid var(--color-border-subtle)`
+- 高度: 44px, padding: `0 20px`, gap: 24px
+- 链接: 圆角 `var(--radius-sm)` (6px), 字号 0.85rem, gap: 6px
+  - 默认: `var(--color-text-muted)`
+  - hover: `var(--color-text)` + `rgba(255,255,255,0.04)` 背景
+  - active (`.router-link-active`): `var(--color-primary)` + `var(--color-primary-glow)` 背景, 底部 2px 金线下划线 + 发光
+- Logo: 字号 1.1rem, 金色, `logo-pulse` 动画 (2s infinite)
 
 ### 2.2 CSS 主题变量（style.css）
 
 ```css
 :root {
-  --color-bg: #1a1a24;
-  --color-surface: #222233;
-  --color-surface-hover: #2a2a3e;
-  --color-border: #333344;
-  --color-text: #e0e0e0;
-  --color-text-muted: #888899;
-  --color-primary: #ffd700;        /* 金色 — 等级/信仰主题色 */
-  --color-primary-dim: #b8860b;
-  --color-success: #4ade80;        /* 绿色 — 成功/完成 */
-  --color-danger: #ef4444;         /* 红色 — 删除/危险 */
+  /* 背景色系 */
+  --color-bg: #0c0c16;                /* 主背景 — 深蓝黑 */
+  --color-bg-alt: #111122;            /* 交替背景 */
+  --color-surface: #16162a;           /* 卡片/面板表面 */
+  --color-surface-hover: #1e1e38;     /* 悬停表面 */
+  --color-surface-raised: #1e1e3a;    /* 浮起表面 */
+
+  /* 边框 */
+  --color-border: #2a2a4a;            /* 主边框 */
+  --color-border-subtle: #1e1e36;     /* 微妙边框 */
+
+  /* 文本 */
+  --color-text: #e4ddd0;              /* 主文本 — 暖白 */
+  --color-text-muted: #7a7a9a;        /* 次文本 */
+  --color-text-dim: #555570;          /* 淡化文本 */
+
+  /* 主题色 */
+  --color-primary: #ffd700;           /* 金色 — 等级/信仰主色 */
+  --color-primary-dim: #b8860b;       /* 暗金 */
+  --color-primary-glow: rgba(255, 215, 0, 0.12);       /* 弱发光 */
+  --color-primary-glow-strong: rgba(255, 215, 0, 0.25); /* 强发光 */
+
+  /* 语义色 */
+  --color-success: #4ade80;           /* 绿色 — 成功/完成 */
+  --color-success-dim: #166534;       /* 暗绿 */
+  --color-danger: #ef4444;            /* 红色 — 删除/危险 */
+  --color-danger-dim: #7f1d1d;       /* 暗红 */
+  --color-work: #fb7185;              /* 工作标签 — 玫瑰红 */
+  --color-study: #60a5fa;             /* 学习标签 — 天蓝 */
+  --color-other: #a78bfa;             /* 其他标签 — 紫 */
+
+  /* 字体 */
+  --font-display: 'Noto Serif SC', 'Songti SC', Georgia, serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* 阴影 */
+  --shadow-panel: 0 2px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+  --shadow-glow: 0 0 20px var(--color-primary-glow), 0 2px 12px rgba(0,0,0,0.4);
+
+  /* 过渡 */
+  --transition-fast: 0.15s cubic-bezier(0.4,0,0.2,1);
+  --transition-normal: 0.25s cubic-bezier(0.4,0,0.2,1);
+  --transition-slow: 0.4s cubic-bezier(0.4,0,0.2,1);
 }
 ```
 
-全局背景: `#1a1a24`, 文字: `#e0e0e0`, 字体栈: 系统默认无衬线
+### 2.3 全局样式
+
+- **body**: font-family `var(--font-body)`, background `var(--color-bg)`, line-height 1.6, antialiased, `overflow:hidden`
+- **#app**: 伪元素背景 — 三层径向渐变（金色顶部、蓝色右下、玫瑰色左下），无交互 (`pointer-events:none`)
+- **button**: 圆角 `var(--radius-sm)`, padding 6px 14px, 字号 0.8rem, 字重 500, hover `translateY(-1px)`
+  - `.primary`: 金色渐变 `linear-gradient(135deg, #ffd700, #b8860b)`, 文字深色, 发光阴影
+  - `.danger`: 暗红背景 + 红文字 + 边框; hover 红底白字
+  - `.success`: 暗绿背景 + 绿文字 + 边框; hover 绿底深字
+- **input/select/textarea**: 深色背景, border 2a2a4a, focus 金色边框 + 3px 发光
+- **select**: 自定义下拉箭头 SVG, padding-right 28px
+- **滚动条**: 宽度 6px, 圆角, hover 颜色加深
+
+### 2.4 全局工具类
+
+| 类名 | 效果 |
+|------|------|
+| `.glass-panel` | `var(--color-surface)` 背景 + 微妙边框 + `var(--shadow-panel)` 阴影; hover 边框加深 |
+| `.section-title` | `font-display`, 0.8rem, 600字重, 大写, muted 色 |
+| `.glow-border` | 相对定位; `::after` 金色渐变边框, hover 显示 |
+| `.animate-in` | `fade-slide-up` 入场动画; nth-child 交错延迟 0.05s |
+
+### 2.5 全局动画关键帧
+
+- `fade-slide-up`: opacity 0→1 + translateY 8→0
+- `glow-pulse`: box-shadow 强弱交替 (8px↔20px)
+- `shimmer`: 光泽扫光效果, background-position 200% 循环
+- `float-up`: 上浮淡入
+- `ember`: 火花粒子消散 (缩放+上升+淡出)
 
 ---
 
@@ -63,27 +142,22 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Dashboard                                                   │
+│  Dashboard (flex, gap: 18px, padding: 20px)                  │
 │  ┌─────────────────┬───────────────────────────────────────┐ │
+│  │  .sidebar        │  .main                               │ │
+│  │  (320px 固定宽)  │  (flex:1, overflow:auto)             │ │
 │  │                 │                                       │ │
-│  │  CalendarView   │         TaskList                      │ │
-│  │  (日历)         │         (任务列表 + 筛选 + 操作)      │ │
-│  │                 │                                       │ │
-│  ├─────────────────┤                                       │ │
+│  │  CalendarView   │  TaskList (任务列表)                  │ │
 │  │  FaithDashboard │                                       │ │
-│  │  (今日信仰汇总) │                                       │ │
-│  ├─────────────────┤                                       │ │
 │  │  StatusPanel    │                                       │ │
-│  │  (等级/护甲)    │                                       │ │
-│  ├─────────────────┤                                       │ │
 │  │  DailyGoalPanel │                                       │ │
-│  │  (每日目标)     │                                       │ │
 │  └─────────────────┴───────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- 左侧边栏: 约 320px，包含日历 + 信仰面板
-- 右侧主区: 弹性填充，任务列表
+- `.sidebar`: 320px, 垂直 flex 布局, gap: 14px
+- `.main`: flex: 1, overflow-y: auto
+- dashboard 外层: display flex, gap 18px, padding 20px
 
 ### 3.2 CalendarView.vue
 
@@ -123,28 +197,37 @@
 
 **功能**: 等级状态总览
 
-**展示**:
+**结构**:
 ```
-┌─────────────┐
-│   Lv{level} │   ← 圆形徽章
-│  {title}    │
-└─────────────┘
-
-升级进度: {progress_to_next} / {interval}
-[==========>    ] 进度条
-
-护甲: {armor} / {total_armor}
-[████████░░░░░░] 护甲条
-
-今日明细:
-- 生存: {survival_faith}
-- 精进: {progress_faith}
-- 戒律: {discipline_faith}
+.status-panel (玻璃面板, padding: 16px, gap: 14px, 顶部 1px 渐变金线)
+├── .level-badge
+│   ├── .level-ring           ← 72px 圆形, conic-gradient 金色环
+│   │   └── .level-num        ← "Lv.{level}", font-display, 1.3rem, 金色发光
+│   └── .level-title           ← 称号 (见习牛马…), 0.8rem, muted
+├── .stat-section
+│   ├── .stat-label            ← "信仰积累", 小号大写 label
+│   ├── .progress-track        ← 8px 高进度条
+│   │   └── .progress-fill     ← 渐变色填充 + shimmer 光泽动画
+│   └── .stat-value            ← "累计 / 上限", mono 字体
+│       ├── .stat-divider       ← "/" 分隔符
+│       └── .stat-target        ← 上限值, 暗金色
+├── .armor-section
+│   ├── .armor-header
+│   │   ├── .stat-label         ← "护甲值"
+│   │   └── .armor-value        ← "{armor} / {total_armor}", 绿色, mono
+│   └── .armor-track           ← 6px 高护甲条
+│       └── .armor-fill         ← 渐变绿填充
 ```
 
-**满级特殊处理**:
-- `next_threshold === null` 时显示「已达最高等级」
-- 进度条显示 100%
+**关键样式**:
+- `.level-ring`: `conic-gradient(from 0deg, #ffd700, #b8860b, #ffd700)`, `::before` 内嵌 3px 形成圆环
+- `.progress-fill::after`: shimmer 光泽扫光
+- `.armor-track`: 6px 高, 圆角 3px
+- 满级: `.max-level` 显示 "已达最高等级", font-display
+
+**CSS 选择器对照** (v2):
+- `.armor-section` (v1: `.armor-bar`)
+- `.progress-track` (v1: `.progress-section`)
 
 ### 3.5 DailyGoalPanel.vue
 
@@ -167,57 +250,98 @@
 
 **功能**: 任务列表 + 状态筛选 + 操作
 
-**布局**:
+**结构**:
 ```
-┌─────────────────────────────────────────┐
-│  [全部] [进行中] [暂停] [已完成] [已放弃] │  ← 筛选标签
-├─────────────────────────────────────────┤
-│  □ 任务标题          [开始] [编辑] [删除]│  ← 每行一个任务
-│  📁 work | 预计 60分钟 | 已用 0分钟       │
-├─────────────────────────────────────────┤
-│  □ 另一个任务        [暂停] [完成] [放弃]│
-│  📚 study | 预计 90分钟 | 已用 45分钟    │
-└─────────────────────────────────────────┘
-```
+.task-list
+├── .task-header
+│   ├── .filter-tabs            ← 筛选项: [全部] [进行中] [暂停] [已完成] [已放弃]
+│   └── button.primary          ← "+ 新建任务"
+└── .tasks
+    ├── .task-row (.status-{status})  ← 每个任务行
+    │   ├── .task-indicator      ← 4px 宽色条 (paused=灰, running=金+发光, completed=绿, abandoned=红)
+    │   ├── .task-info
+    │   │   ├── .task-title      ← 0.88rem, 600字重, 文字溢出省略号
+    │   │   └── .task-meta       ← flex 行, 分类徽章 · 预计分钟 · 已用秒
+    │   │       ├── .task-category (.work/.study/.other) ← 分类彩色标签
+    │   │       └── .meta-sep    ← "·" 分隔符, dim color
+    │   └── .task-actions        ← 根据 status 动态显示操作按钮
+    └── .empty                   ← "◈ 暂无任务" (图标 + 文字)
 
-**筛选标签**:
-- 全部 / running / paused / completed / abandoned
-- 点击切换 filter，触发 task store 重新过滤
+筛选标签样式:
+- 默认: transparent 背景, muted 文字
+- hover: surface 背景, text 文字, subtle 边框
+- active: primary-glow 背景, primary 文字, 金色边框
+```
 
 **任务操作按钮**（根据状态动态显示）:
 - `Paused` → [开始] [编辑] [删除]
 - `Running` → [暂停] [完成] [放弃]
-- `Completed` → [删除]（灰色，不可编辑）
-- `Abandoned` → [删除]
+- `Paused` (额外) → [继续] `.success`
+- `Completed` → 无操作（灰色不可编辑）
+- `Abandoned` → 无操作
 
-**新建任务按钮**: 底部或顶部「+ 新建任务」→ 打开 TaskForm 弹窗
+**任务行样式**:
+- 边框: `1px solid var(--color-border-subtle)`
+- 圆角: `var(--radius-md)`
+- padding: 12px 14px, gap: 12px
+- hover: border 加深 + surface-hover 背景
 
 ---
 
 ## 4. 任务表单（TaskForm.vue）
 
-### 4.1 弹窗内容
+### 4.1 弹窗
 
 ```
-┌────────────────────────────┐
-│  新建任务 / 编辑任务    [×] │
-├────────────────────────────┤
-│  标题: [________________]  │
-│  描述: [________________]  │
-│  分类: ○ work  ○ study  ○ other
-│  预计时长: [____] 分钟     │
-│  日期: [2026-05-05]        │
-│  [☑] 每日执行              │
-│  所属列: [下拉选择看板列___]│  ← 仅看板模式下
-├────────────────────────────┤
-│        [取消]  [保存]      │
-└────────────────────────────┘
+┌─────────────────────────────────────┐
+│  新建任务                        [✕] │  ← modal-header, font-display title
+├─────────────────────────────────────┤
+│  任务名称                            │  ← .field-group > .field-label
+│  [                               ]  │
+│                                     │
+│  描述                                │
+│  [                               ]  │  ← textarea, rows=2
+│                                     │
+│  ┌──────────┐  ┌──────────┐        │  ← .field-row (flex, gap: 12px)
+│  │ 分类      │  │ 预计时长  │        │
+│  │ [工作 ▼] │  │ [___] 分钟│        │
+│  └──────────┘  └──────────┘        │
+│                                     │
+│  [✓] 每日执行                       │  ← .checkbox-field (custom checkbox)
+├─────────────────────────────────────┤
+│                   [取消]  [创建任务]  │  ← modal-footer, primary 按钮
+└─────────────────────────────────────┘
 ```
 
-**字段验证**:
-- 标题: 必填
-- 预计时长: 必填，> 0
-- 日期: 默认为今天
+### 4.2 字段
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| title | text | ✅ | 任务名称 |
+| description | textarea | ❌ | 可选描述 |
+| category | select | ✅ | work / study / other (展示中文: 工作/学习/其他) |
+| estimated | number | ✅ | > 0, 分钟 |
+| daily | checkbox | ❌ | 自定义复选框 (`.check-box`) |
+
+### 4.3 动画
+
+- `.modal-overlay`: `fade-in` 0.2s ease + `blur(8px)` 背景模糊
+- `.modal`: `modal-enter` 0.25s cubic-bezier — 缩放 0.95→1 + 上移 10px
+- 关闭按钮: 圆形, hover 背景出现
+
+### 4.4 自定义复选框
+
+```html
+<label class="checkbox-field">
+  <input type="checkbox" v-model="daily" />
+  <span class="check-box"></span>
+  <span>每日执行</span>
+</label>
+```
+
+- `.check-box`: 18×18, border 2px, 圆角 4px
+- `input:checked + .check-box`: 金色背景 + "✓" 伪元素
+- input 默认 `display:none`
 
 ---
 
@@ -227,132 +351,102 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  KanbanPage                                                  │
-│  ┌──────────┬──────────┬──────────┬──────────┐               │
-│  │  待办    │  进行中  │  暂停中  │  已完成  │  [+ 添加列]  │
-│  │  (+)     │  (+)     │          │          │               │
-│  ├──────────┼──────────┼──────────┼──────────┤               │
-│  │ ┌──────┐ │ ┌──────┐ │ ┌──────┐ │ ┌──────┐ │               │
-│  │ │Task 1│ │ │Task 3│ │ │Task 4│ │ │Task 2│ │               │
-│  │ │⏱ 5:23│ │ │⏱ 1:12│ │ │      │ │ │✓     │ │               │
-│  │ │📎进程│ │ │      │ │ │      │ │ │      │ │               │
-│  │ └──────┘ │ └──────┘ │ └──────┘ │ └──────┘ │               │
-│  │ ┌──────┐ │          │          │          │               │
-│  │ │Task 5│ │          │          │          │               │
-│  │ └──────┘ │          │          │          │               │
-│  └──────────┴──────────┴──────────┴──────────┘               │
+│  .kanban-page (padding:20px, height:calc(100vh-44px), overflow:hidden)│
+│  ┌──────────────────────────────────────────────────────────┐ │
+│  │  .board                                                  │ │
+│  │  ┌────────────────────────────────────────────────────┐  │ │
+│  │  │  .board-header                                     │  │ │
+│  │  │  .board-title "任务看板"  .board-actions            │  │ │
+│  │  │                          [+ 添加列] [重置默认]     │  │ │
+│  │  ├────────────────────────────────────────────────────┤  │ │
+│  │  │  .board-columns (flex, gap:14px, overflow-x:auto)  │  │ │
+│  │  │  ┌──────────┬──────────┬──────────┬──────────┐    │  │ │
+│  │  │  │ 待办  [1]│ 进行中[2]│ 暂停中[0]│ 已完成[1]│    │  │ │
+│  │  │  │   [+]    │   [+]    │   [+]    │   [+]    │    │  │ │
+│  │  │  ├─card─────┤──card────┤          │──card────┤    │  │ │
+│  │  │  └──────────┴──────────┴──────────┴──────────┘    │  │ │
+│  │  └────────────────────────────────────────────────────┘  │ │
+│  └──────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- 水平排列的列，每列固定宽度（如 280px），可横向滚动
-- 每列顶部：标题 + 任务数量 + [+] 新建任务按钮
-- 列内垂直排列 KanbanCard，支持拖拽排序
+### 5.2 KanbanBoard.vue
 
-### 5.2 KanbanColumn.vue
-
-**Props**:
-```typescript
-interface Props {
-  column: KanbanColumn;
-  cards: KanbanCard[];  // 该列的卡片，按 orderInColumn 排序
-}
+**结构**:
+```
+.board (flex-column, gap:16px, height:100%)
+├── .board-header (flex, space-between, align:center)
+│   ├── .board-title (font-display, 1.1rem, 700字重)
+│   └── .board-actions (flex, gap:8px)
+│       ├── button: "+ 添加列" (surface bg, subtle border)
+│       └── button: "重置默认"
+└── .board-columns (flex, gap:14px, flex:1, overflow-x:auto)
+    └── KanbanColumn × N
 ```
 
-**事件**:
-- `@drop(cardId, targetIndex)` — 拖拽释放时触发
-- `@addCard(columnId)` — 点击 + 按钮
-- `@deleteColumn(columnId)` — 删除列（仅自定义列）
+**操作按钮样式**: 0.78rem, surface 背景, subtle 边框, muted 文字; hover 颜色加深
 
-**样式**:
-- 背景: `var(--color-bg)` 或略深的表面色
-- 边框: `1px solid var(--color-border)`
-- 圆角: `8px`
-- padding: `12px`
-- 拖拽悬停: 边框高亮 `var(--color-primary)`
+### 5.3 KanbanColumn.vue
 
-### 5.3 KanbanCard.vue
-
-**Props**:
-```typescript
-interface Props {
-  card: KanbanCard;
-  isDragging?: boolean;
-}
+**结构**:
 ```
-
-**展示内容**:
-```
-┌─────────────────────────────┐
-│  任务标题                    │
-│  📁 work | ⏱ 预计 60分钟    │
-│  ─────────────────────────  │
-│  ⏱ 已用: 00:05:23  (实时)  │  ← Running 时显示计时器
-│  [开始] [暂停] [完成] [×]   │  ← 操作按钮
-│  📎 notepad.exe (自动)      │  ← 进程绑定显示
-└─────────────────────────────┘
+.column (min-width:260px, max-width:300px, flex-shrink:0)
+├── .column-header (padding:14px 14px 0)
+│   ├── .column-info
+│   │   ├── .column-title    ← font-display, 0.85rem, 600字重
+│   │   └── .column-count     ← mono font, 0.72rem, 圆角徽章
+│   └── .column-add           ← 圆形 "+" 按钮, hover 变金色
+├── .column-cards (padding:0 10px 10px, gap:6px)
+│   └── KanbanCard × N
+└── KanbanCardForm (条件渲染)
 ```
 
 **交互**:
-- 拖拽: `draggable="true"`，`@dragstart` 设置数据，`@dragend` 清理
-- 双击: 打开编辑弹窗（KanbanCardForm）
-- 计时器: Running 状态时，前端 `setInterval(1000)` 实时更新 `duration_seconds` 显示
+- `@dragover.prevent` + `@dragleave` → 切换 `.dragging` 类
+- 拖入时: 边框变金色, 背景变 primary-glow
+- `@drop` → `kanban.moveCard(cardId, columnId)`
 
-**进程绑定 UI**:
-- 显示绑定应用名（如 "notepad.exe"）
-- 绿色圆点: 进程正在运行
-- 灰色圆点: 进程未运行
+### 5.4 KanbanCard.vue
 
-### 5.4 KanbanBoard.vue
-
-**职责**:
-- 管理列数组和卡片 Map
-- 处理跨列拖拽逻辑
-- 进程绑定轮询协调
-- 计时器管理
-
-**拖拽逻辑**:
-```typescript
-function onDrop(cardId: string, targetColumnId: string, targetIndex: number) {
-    const card = cards.get(cardId);
-    const sourceColumnId = card.columnId;
-    
-    // 1. 从源列移除
-    const sourceCol = columns.find(c => c.id === sourceColumnId);
-    sourceCol.taskIds = sourceCol.taskIds.filter(id => id !== cardId);
-    
-    // 2. 插入目标列
-    const targetCol = columns.find(c => c.id === targetColumnId);
-    targetCol.taskIds.splice(targetIndex, 0, cardId);
-    
-    // 3. 更新卡片
-    card.columnId = targetColumnId;
-    
-    // 4. 若跨列且目标列是"进行中" → 自动 start_task
-    // 5. 若跨列且目标列是"暂停中" → 自动 pause_task
-    // 6. 若跨列且目标列是"已完成" → 自动 complete_task
-    
-    // 7. 持久化
-    kanbanApi.saveConfig({ columns });
-}
+**结构**:
 ```
+.card (bg-alt, subtle border, 圆角, cursor:pointer)
+├── .card-info
+│   ├── .card-title             ← 关联任务标题, 0.82rem, 500字重
+│   └── .card-category          ← work/study/other 彩色标签, 0.65rem
+└── .card-timer (条件: timerRunning)
+    ├── .timer-dot              ← 5px 金色圆点, 脉冲动画
+    └── "进行中"                ← 0.7rem, primary color
+```
+
+**交互**:
+- `draggable="true"`, `@dragstart` 设置 `text/plain` data
+- `@click` → emits `edit(card.id)`, 打开编辑弹窗
+- hover: border 加深, bg 变亮, `translateX(2px)`
+- active: `cursor:grabbing`
 
 ### 5.5 KanbanCardForm.vue
 
-**功能**: 在看板内直接创建/编辑任务，比 TaskForm 多了进程绑定和提醒设置
-
-**额外字段**:
+**结构**:
 ```
-进程绑定:
-  应用名: [____________] [搜索进程]
-  [☑] 进程启动时自动开始
-  [☑] 进程结束时自动暂停
-
-提醒:
-  时间: [__:__] (HH:mm)
-  [☑] 启用提醒
-
-所属列: [下拉: 待办/进行中/暂停中/已完成/自定义列]
+.overlay (fixed, inset:0, blur(4px))
+└── .form-panel (width:360px, surface bg, border, 圆角)
+    ├── .form-title "添加卡片"  (font-display, 0.95rem, 700)
+    ├── .form-field
+    │   ├── label "关联任务"    (0.75rem, 600字重, muted)
+    │   └── select (未关联到看板的 tasks)
+    └── .form-actions
+        ├── [取消]
+        └── [添加] .primary
 ```
+
+**功能**: 选中未关联看板的已有任务，添加到指定列
+
+**CSS 选择器对照** (v2):
+- `.board` (v1: `.kanban-board`)
+- `.board-title` (v1: `.board-header h2`)
+- `.column` (v1: `.kanban-column`)
+- `.card` (v1: `.kanban-card`)
 
 ---
 
@@ -361,25 +455,32 @@ function onDrop(cardId: string, targetColumnId: string, targetIndex: number) {
 ### 6.1 布局
 
 ```
-┌──────────────┐
-│              │
-│     Lv.5     │  ← 圆形徽章（窗口 80×80，组件填满窗口）
-│     15420    │     深色渐变背景 + 金色边框光晕
-│              │
-└──────────────┘
+┌──────────────────┐
+│                  │
+│   .widget-bg     │  ← conic-gradient 旋转环 (8s infinite spin)
+│   ┌──────────┐   │
+│   │          │   │
+│   │  Lv.0    │   │  ← .widget-inner (inset:4px, rounded, bg-bg)
+│   │  ──────  │   │  ← .widget-divider (渐变横线)
+│   │    0     │   │  ← .widget-faith (小字, mono, muted)
+│   │          │   │
+│   └──────────┘   │
+│                  │
+└──────────────────┘
 ```
 
-- 圆形等级徽章，深色渐变背景 `linear-gradient(135deg, #1a1a2e, #16213e)`
-- 金色半透明边框 `rgba(255, 215, 0, 0.4)`，hover 时发光增强
-- 中心大字号显示等级（`Lv.{level}`，金色 `#ffd700`，14px 粗体）
-- 底部小字显示累计信仰值（8px，灰色 `#a0a0a0`）
-- hover 缩放 1.05 倍，active 缩至 0.95
+- 窗口 80×80，组件使用 `width: min(100vw, 100vh); height: min(100vw, 100vh)` 保证正方形
+- `.widget-bg`: 绝对定位, `border-radius: 50%` (完美圆形), `conic-gradient` 从 surface → primary-dim → surface, 8s 线性旋转
+- `.widget-inner`: 绝对定位, inset:4px, `border-radius: 50%`, `var(--color-bg)`, flex-column 居中, gap:2px, 1px 金色半透明边框
+- `.widget-level`: `font-display`, 1rem, 900字重, 金色发光
+- `.widget-divider`: 20px 宽, 1px 高, 渐变成水平线
+- `.widget-faith`: 0.65rem, `font-mono`, muted
 
 ### 6.2 交互
 
 - **拖拽**: 鼠标按住超过 4px 阈值后调用 `getCurrentWindow().startDragging()` 拖动窗口
 - **双击**: 调用 `show_main_window` 命令打开/聚焦主窗口（主窗口不存在时自动创建 900×700 窗口）
-- **数据刷新**: 每 10 秒轮询 `get_status` 更新等级和信仰值
+- **数据刷新**: 每 5 秒轮询 `get_status` 更新等级和信仰值
 
 ### 6.3 窗口特性
 
@@ -392,6 +493,16 @@ transparent: true       // 透明背景
 shadow: false           // 无阴影
 resizable: false
 ```
+
+### 6.4 触发方式
+
+- **系统托盘菜单**: 右键托盘图标 → "打开悬浮窗" (`id: "floating"`)
+- **Tauri 命令**: `open_floating_widget` / `close_floating_widget`
+- **路由直接访问**: `/#/floating` (开发调试用)
+- **Tauri 窗口 URL**: 使用 `/?f=1` 查询参数（非 `/#/floating`），因 Tauri 不完全支持 URL 中的 `#` 字符。`index.html` 内联脚本在 Vue 启动前将 `?f=1` 转换为 `#/floating`
+- 若悬浮窗已存在，调用 `show()`；否则用 `WebviewWindowBuilder` 创建
+
+> **注意**: 浏览器模式无法触发托盘菜单，悬浮窗测试需在 Tauri 环境中通过托盘菜单启动。
 
 ---
 
@@ -480,17 +591,79 @@ App.vue
 
 ---
 
-## 10. 图标与视觉规范
+## 10. 图标、字体与视觉规范
 
-| 元素 | 颜色 | 说明 |
-|------|------|------|
-| 等级徽章 | `#ffd700` 金色 | 主主题色 |
-| 进度条填充 | `#ffd700` | 升级进度 |
-| 护甲条填充 | `#4ade80` 绿色 | 防护 |
-| 工作标签 | `#ef4444` 红色系 | work |
-| 学习标签 | `#3b82f6` 蓝色系 | study |
-| 其他标签 | `#888899` 灰色 | other |
-| 成功/完成 | `#4ade80` 绿色 | completed |
-| 危险/删除 | `#ef4444` 红色 | delete / abandon |
-| 进行中 | `#ffd700` 金色 | running |
-| 暂停 | `#888899` 灰色 | paused |
+### 10.1 字体系统
+
+| 用途 | CSS 变量 | 字体栈 | 文件 |
+|------|---------|--------|------|
+| 标题/展示 | `--font-display` | Noto Serif SC, Songti SC, Georgia, serif | Google Fonts |
+| 正文/UI | `--font-body` | Plus Jakarta Sans, -apple-system, sans-serif | Google Fonts |
+| 代码/数字 | `--font-mono` | JetBrains Mono, Consolas, monospace | Google Fonts |
+
+Google Fonts 在 `index.html` 中以 `<link>` 方式加载，包含字号 400/500/600/700/900。
+
+### 10.2 颜色语义
+
+| 用途 | CSS 变量 | 色值 | 使用场景 |
+|------|---------|------|---------|
+| 主背景 | `--color-bg` | `#0c0c16` | body, app 全局背景 |
+| 面板背景 | `--color-surface` | `#16162a` | 卡片, 面板, nav-bar |
+| 悬停背景 | `--color-surface-hover` | `#1e1e38` | button:hover, 行 hover |
+| 主文本 | `--color-text` | `#e4ddd0` | 标题, 正文 |
+| 次文本 | `--color-text-muted` | `#7a7a9a` | 元数据, label |
+| 淡化文本 | `--color-text-dim` | `#555570` | placeholder, 分隔符 |
+| 金色 | `--color-primary` | `#ffd700` | 等级徽章, 进度条填充, 激活态 |
+| 暗金 | `--color-primary-dim` | `#b8860b` | 渐变终点, 次要金色元素 |
+| 金色发光 | `--color-primary-glow` | `rgba(255,215,0,.12)` | 发光阴影, 金色背景层 |
+| 绿色 | `--color-success` | `#4ade80` | 护甲值, 完成态 |
+| 暗绿 | `--color-success-dim` | `#166534` | success 按钮背景 |
+| 红色 | `--color-danger` | `#ef4444` | 删除, 废弃态 |
+| 暗红 | `--color-danger-dim` | `#7f1d1d` | danger 按钮背景 |
+| 工作标签 | `--color-work` | `#fb7185` | work category badge |
+| 学习标签 | `--color-study` | `#60a5fa` | study category badge |
+| 其他标签 | `--color-other` | `#a78bfa` | other category badge |
+
+### 10.3 任务状态色指示
+
+| 状态 | 指示器颜色 | 说明 |
+|------|-----------|------|
+| running | `#ffd700` 金 + glow | 进行中, 脉冲发光 |
+| paused | `#555570` 灰 | 暂停, dim |
+| completed | `#4ade80` 绿 | 已完成 |
+| abandoned | `#ef4444` 红 | 已放弃 |
+
+### 10.4 间距与尺寸规范
+
+| 元素 | 值 |
+|------|----|
+| nav-bar 高度 | 44px |
+| sidebar 宽度 | 320px |
+| kanban 列宽 | min 260px, max 300px |
+| 卡片 padding | 12px 14px |
+| 组件间 gap | 14-18px |
+| 悬浮窗尺寸 | 80×80px |
+
+---
+
+## 附录 A：CSS 选择器迁移对照 (v1 → v2)
+
+| v1 选择器 | v2 选择器 | 影响范围 |
+|-----------|-----------|---------|
+| `.main-area` | `.main` | Dashboard.vue |
+| `.kanban-board` | `.board` | KanbanBoard, smoke.spec.ts |
+| `.kanban-column` | `.column` | KanbanColumn |
+| `.kanban-card` | `.card` | KanbanCard |
+| `.armor-bar` | `.armor-section` | StatusPanel, smoke.spec.ts |
+| `.progress-section` | `.progress-track` | StatusPanel, smoke.spec.ts |
+| `.board-header h2` | `.board-header .board-title` | KanbanBoard, smoke.spec.ts |
+
+## 附录 B：新增 DOM 结构
+
+| 组件 | 新增结构 |
+|------|---------|
+| StatusPanel | `.level-ring` (72px 圆环) + `.level-num` 内嵌; `.armor-header` + `.armor-track`; `.stat-section` |
+| TaskList | `.task-indicator` (4px 状态色条); `.task-category` (分类标签) |
+| TaskForm | `.field-group` + `.field-label`; `.checkbox-field` + `.check-box` (自定义复选框) |
+| FloatingWidget | `.widget-bg` (旋转环) + `.widget-inner` (内嵌圆); `.widget-divider` |
+| App.vue | `.nav-glow` (底部渐变金线); `.nav-icon` (导航图标); `logo-pulse` 动画 |

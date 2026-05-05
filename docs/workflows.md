@@ -399,7 +399,7 @@ Lv11-Lv15: 6,000
     IF floating 窗口已存在:
         window.show() + set_focus()
     ELSE:
-        WebviewWindowBuilder::new("floating")
+        WebviewWindowBuilder::new("floating", WebviewUrl::App("/?f=1".into()))
             .inner_size(80.0, 80.0)
             .always_on_top(true)
             .decorations(false)
@@ -413,6 +413,8 @@ Lv11-Lv15: 6,000
     显示圆形等级徽章，支持鼠标拖拽
     双击 → invoke_show_main_window()
 ```
+
+> **注意**: Tauri 使用 `/?f=1` 查询参数而非 `/#/floating` hash 路由创建悬浮窗，因 Tauri WebView 不完全支持 URL 中的 `#` 字符。`index.html` 中的内联脚本在 Vue 启动前自动将 `?f=1` 转换为 `#/floating`。
 
 ### 8.2 关闭悬浮窗
 

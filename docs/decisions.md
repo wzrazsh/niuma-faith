@@ -350,8 +350,8 @@ let db_path = if user_db_exists {
 | 悬浮窗 | `floating` | 80×80 | always_on_top, decorations=false, skip_taskbar, transparent |
 
 **托盘**：
-- 左键单击：显示主窗口
-- 右键菜单：显示主窗口 / 打开悬浮窗 / 退出
+- 左键单击：显示主窗口（不存在则自动创建 900×700）
+- 右键菜单：显示主窗口（不存在则创建） / 打开悬浮窗 / 退出
 
 ### 理由
 - **轻量**：悬浮窗只显示圆形等级徽章，不干扰工作

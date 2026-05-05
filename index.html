@@ -11,6 +11,11 @@
   </head>
   <body>
     <div id="app"></div>
+    <script>
+      if (location.search.indexOf('f=1') !== -1) {
+        location.hash = '#/floating';
+      }
+    </script>
     <script type="module" src="/frontend/src/main.ts"></script>
   </body>
 </html>

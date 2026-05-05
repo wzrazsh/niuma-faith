@@ -74,6 +74,13 @@ fn main() {
                         "show" => {
                             if let Some(w) = app.get_webview_window("main") {
                                 let _ = w.show(); let _ = w.set_focus();
+                            } else {
+                                let _ = tauri::WebviewWindowBuilder::new(
+                                    app, "main", tauri::WebviewUrl::App("/".into()),
+                                )
+                                .title("牛马信仰")
+                                .inner_size(900.0, 700.0)
+                                .build();
                             }
                         }
                         "floating" => {
@@ -81,7 +88,7 @@ fn main() {
                                 let _ = w.show();
                             } else {
                                 let _ = tauri::WebviewWindowBuilder::new(
-                                    app, "floating", tauri::WebviewUrl::App("/floating".into()),
+                                    app, "floating", tauri::WebviewUrl::App("/?f=1".into()),
                                 )
                                 .inner_size(80.0, 80.0)
                                 .always_on_top(true)

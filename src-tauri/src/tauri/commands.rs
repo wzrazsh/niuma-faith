@@ -259,7 +259,7 @@ pub async fn open_floating_widget(app: tauri::AppHandle) -> Result<(), String> {
         window.set_focus().map_err(|e| e.to_string())?;
         return Ok(());
     }
-    let window = WebviewWindowBuilder::new(&app, "floating", WebviewUrl::App("/#/floating".into()))
+    let window = WebviewWindowBuilder::new(&app, "floating", WebviewUrl::App("/?f=1".into()))
         .title("牛马信仰 悬浮")
         .inner_size(80.0, 80.0)
         .resizable(false)
