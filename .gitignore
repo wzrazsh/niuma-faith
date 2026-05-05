@@ -2,3 +2,4 @@ node_modules
 .claude
 src-tauri/target
 frontend/dist
+test-results
