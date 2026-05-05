@@ -140,9 +140,14 @@ frontend/src/
 
 **`kanban.ts`**
 - `state`: `columns: KanbanColumn[]`, `cards: Map<string, KanbanCard>`, `activeTimers: Map<string, number>`, `isLoading`
+- `taskMap`: computed — 从 taskStore 构建 `Record<string, Task>` 索引，供组件快速查任务详情
 - `loadBoard()`: 从 `kanban-api.ts` 读取列配置，从 `task.ts` 加载任务，合成 cards
+- `columnCards(columnId)`: 返回指定列的 KanbanCard[] 列表
+- `columnSwimlanes(columnId)`: 按 Task.category 分组返回 SwimlaneGroup[]（工作/学习/其他），空组过滤
 - `moveCard(cardId, targetColumnId, targetIndex)`: 更新 cards 和 columns 的 taskIds，持久化
+- `addCard(columnId, taskId)`: 将已存在任务关联到指定列
 - `addColumn(title)`, `removeColumn(id)`: 列管理
+- `resetToDefault()`: 清空卡片和计时器，恢复 4 个默认列
 - `startTimer(cardId)`, `stopTimer(cardId)`: 前端实时计时器（setInterval，每秒更新）
 
 ### 3.3 双模式 IPC 机制

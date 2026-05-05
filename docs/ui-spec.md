@@ -361,9 +361,12 @@
 │  │  ├────────────────────────────────────────────────────┤  │ │
 │  │  │  .board-columns (flex, gap:14px, overflow-x:auto)  │  │ │
 │  │  │  ┌──────────┬──────────┬──────────┬──────────┐    │  │ │
-│  │  │  │ 待办  [1]│ 进行中[2]│ 暂停中[0]│ 已完成[1]│    │  │ │
+│  │  │  │ 待办  [1]│ 进行中[2]│ 暂停中[1]│ 已完成[1]│    │  │ │
 │  │  │  │   [+]    │   [+]    │   [+]    │   [+]    │    │  │ │
-│  │  │  ├─card─────┤──card────┤          │──card────┤    │  │ │
+│  │  │  │ ● 工作   │ ● 学习   │ ● 工作   │ ● 学习   │    │  │ │
+│  │  │  │  card    │  card    │  card    │  card    │    │  │ │
+│  │  │  │          │ ● 其他   │          │          │    │  │ │
+│  │  │  │          │  card    │          │          │    │  │ │
 │  │  │  └──────────┴──────────┴──────────┴──────────┘    │  │ │
 │  │  └────────────────────────────────────────────────────┘  │ │
 │  └──────────────────────────────────────────────────────────┘ │
@@ -396,15 +399,22 @@
 │   │   ├── .column-title    ← font-display, 0.85rem, 600字重
 │   │   └── .column-count     ← mono font, 0.72rem, 圆角徽章
 │   └── .column-add           ← 圆形 "+" 按钮, hover 变金色
-├── .column-cards (padding:0 10px 10px, gap:6px)
-│   └── KanbanCard × N
+├── .column-cards (padding:0 10px 10px, gap:8px)
+│   ├── .swimlane × N
+│   │   ├── .swimlane-header
+│   │   │   ├── .swimlane-dot       ← 6px 颜色圆点 (work/study/other)
+│   │   │   ├── .swimlane-label     ← 0.68rem, uppercase, muted
+│   │   │   └── .swimlane-count     ← 0.62rem, mono font
+│   │   └── KanbanCard × N
 └── KanbanCardForm (条件渲染)
 ```
+
+**泳道分组**: 每列内按 Task.category（work/study/other）分为 工作/学习/其他 三组，仅显示非空组。
 
 **交互**:
 - `@dragover.prevent` + `@dragleave` → 切换 `.dragging` 类
 - 拖入时: 边框变金色, 背景变 primary-glow
-- `@drop` → `kanban.moveCard(cardId, columnId)`
+- `@drop` → `kanban.moveCard(cardId, targetColumnId, targetIndex)`
 
 ### 5.4 KanbanCard.vue
 

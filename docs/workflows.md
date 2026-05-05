@@ -277,16 +277,16 @@
 ### 5.1 加载看板
 
 ```
-[前端] KanbanPage.vue mounted
+[前端] KanbanBoard.vue onMounted
     ↓
 [Store] kanban.ts loadBoard()
     1. kanban-api.ts loadConfig() → localStorage.getItem('kanban-board-config')
        ├─ 有 → JSON.parse 为 BoardConfig
        └─ 无 → 创建默认列：
-          col1: {id:'todo', title:'待办', order:0, taskIds:[], isCustom:false}
-          col2: {id:'inprogress', title:'进行中', order:1, ...}
-          col3: {id:'paused', title:'暂停中', order:2, ...}
-          col4: {id:'done', title:'已完成', order:3, ...}
+           col1: {id:'todo', title:'待办', order:0, taskIds:[], isCustom:false}
+           col2: {id:'inprogress', title:'进行中', order:1, ...}
+           col3: {id:'paused', title:'暂停中', order:2, ...}
+           col4: {id:'done', title:'已完成', order:3, ...}
     2. task.ts loadTasksByDate(今天)
     3. 将 Task[] 按 status 映射到列：
        ├─ Paused → 待办（若未指定列）
@@ -295,6 +295,9 @@
        └─ Completed/Abandoned → 已完成
     4. 为每个任务创建 KanbanCard，存入 cards Map
     5. 恢复 activeTimers（Running 任务启动 setInterval）
+[UI] KanbanColumn 按 category 分组渲染泳道
+    columnSwimlanes(columnId) → SwimlaneGroup[]
+    └─ 每列内按 work/study/other 显示 工作/学习/其他 分组，空组自动隐藏
 ```
 
 ### 5.2 拖拽移动卡片
