@@ -1,7 +1,7 @@
 use tauri::{Manager, PhysicalSize, State, WebviewUrl, WebviewWindowBuilder};
 use crate::domain::models::*;
 use crate::domain::task::*;
-use crate::data::repository::DailyRecordRepo;
+use crate::data::repository::{DailyRecordRepo, UserRepo};
 use crate::tauri::state::AppState;
 
 #[tauri::command]
@@ -211,8 +211,29 @@ pub async fn get_daily_stats(
     state: State<'_, AppState>,
     user_id: String,
     date: String,
-) -> Result<Option<DailyRecord>, String> {
-    state.db.get_by_date(&user_id, &date)
+) -> Result<Option<DailyStats>, String> {
+    let record = state.db.get_by_date(&user_id, &date)?;
+    match record {
+        Some(r) => {
+            let cumulative_faith = state.db.get_user(&user_id)?
+                .map(|u| u.cumulative_faith)
+                .unwrap_or(0);
+            Ok(Some(DailyStats {
+                date: r.date,
+                work_minutes: r.work_minutes,
+                study_minutes: r.study_minutes,
+                survival_faith: r.survival_faith,
+                progress_faith: r.progress_faith,
+                discipline_faith: r.discipline_faith,
+                total_faith: r.total_faith,
+                task_bonus_work: r.task_bonus_work,
+                task_bonus_study: r.task_bonus_study,
+                tasks_completed: r.tasks_completed,
+                cumulative_faith,
+            }))
+        }
+        None => Ok(None),
+    }
 }
 
 #[tauri::command]

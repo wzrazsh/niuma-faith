@@ -15,11 +15,15 @@ impl LocalHttpServer {
         LocalHttpServer { app_state, port, token }
     }
 
+    pub fn try_bind(port: u16) -> Result<Server, String> {
+        Server::http(format!("127.0.0.1:{}", port)).map_err(|e| format!("Failed to bind HTTP server: {}", e))
+    }
+
     pub fn run(self) {
-        let server = match Server::http(format!("127.0.0.1:{}", self.port)) {
+        let server = match Self::try_bind(self.port) {
             Ok(s) => s,
             Err(e) => {
-                tracing::error!("Failed to start HTTP server: {}", e);
+                tracing::error!("{}", e);
                 return;
             }
         };
@@ -28,6 +32,16 @@ impl LocalHttpServer {
         for request in server.incoming_requests() {
             let state = self.app_state.clone();
             let token = self.token.clone();
+            thread::spawn(move || handle_request(request, state, &token));
+        }
+    }
+
+    pub fn serve(server: Server, app_state: Arc<AppState>, token: String, port: u16) {
+        tracing::info!("Local HTTP server listening on 127.0.0.1:{}", port);
+
+        for request in server.incoming_requests() {
+            let state = app_state.clone();
+            let token = token.clone();
             thread::spawn(move || handle_request(request, state, &token));
         }
     }

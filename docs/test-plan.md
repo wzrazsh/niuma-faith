@@ -17,25 +17,26 @@
 
 ---
 
-## 二、Rust 后端测试（当前 141 tests）
+## 二、Rust 后端测试（当前 14 tests）
 
-### 2.1 Domain 层 — 纯函数单元测试
+> ⚠️ 实际测试仅覆盖 domain 层。data / application / tauri 层尚无测试，测试计划中其他层次的测试数量为预期补充值，非当前实际状态。
 
-| 模块 | 测试数 | 覆盖点 |
+### 2.1 Domain 层 — 纯函数单元测试（14 tests）
+
+| 模块 | 测试数 | 实际覆盖点 |
 |------|--------|--------|
-| `domain::faith` | 42 | `calc_survival` 9 档位边界；`calc_progress` 5 档位边界；`calc_discipline` 10 种组合；`calculate_daily` 7 种场景（空日/8h工作/8h+4h/满负载/边界） |
-| `domain::level` | 17 | `get_level` 各阈值/超界；`progress_to_next` 各级；`interval_to_next`；满级；全称号验证 |
-| `domain::task` | 9 | `calc_task_bonus` work/study/other 各分钟段（30/60/90/120min） |
-| `domain::models` | 2 | 模型结构序列化等 |
+| `domain::faith` | 5 | `calc_discipline_perfect`, `calc_discipline_worst`, `calculate_daily_full`, `calc_survival_negative`, `calc_survival_tiers` |
+| `domain::level` | 5 | `calc_armor`, `get_level_lv1`, `get_level_lv2`, `get_level_lv15`, `progress_to_next` |
+| `domain::task` | 4 | `calc_task_bonus_work`, `calc_task_bonus_other`, `calc_task_bonus_min_one_hour`, `is_historical` |
 
 **需补充的测试：**
 
-- [ ] `domain::faith::calc_survival` — 负数输入处理
+- [ ] `domain::faith::calc_progress` — 各档位边界测试
 - [ ] `domain::faith::calc_discipline` — `leave_record` 非法值（如 99）
-- [ ] `domain::level::LEVELS` — 确认 15 级 2.0 阈值全部 ×10 无误
+- [ ] `domain::level::LEVELS` — 确认 15 级 2.0 阈值全部正确
 - [ ] `domain::models::ProcessInfo` — JSON 序列化/反序列化往返
 
-### 2.2 Data 层 — SQLite 持久化（共 15 项）
+### 2.2 Data 层 — SQLite 持久化（🔲 待补充，目标 15 项）
 
 | 测试 | 覆盖点 |
 |------|--------|
@@ -43,7 +44,7 @@
 | `upsert_daily_record_last_write_wins` | 同日多次写入取最新 |
 | `cross_day_separate_records` | 跨天记录隔离 |
 | `add_faith_updates_level` | 增加累计信仰触发等级更新 |
-| ……(其余 11 项见 `src-tauri/src/data/sqlite.rs::tests`) | armor 字段、faith_transactions、task_sessions 等 |
+| ……(其余 11 项) | armor 字段、faith_transactions、task_sessions 等 |
 
 **需补充的测试：**
 
@@ -51,9 +52,9 @@
 - [ ] `faith_transactions` 表 — 查询/插入交易记录
 - [ ] `task_sessions` 表 — 会话创建/更新/完成生命周期
 - [ ] 并发安全 — 多线程同时写入（Mutex 锁验证）
-- [ ] Schema 迁移 — `ensure_column` 对 `armr` 列的幂等性
+- [ ] Schema 迁移 — `ensure_column` 列操作的幂等性
 
-### 2.3 Application 层 — 业务逻辑（共 29 项 = faith_service 9 + ledger_service 5 + task_service 15）
+### 2.3 Application 层 — 业务逻辑（🔲 待补充，目标 29 项 = faith_service 9 + ledger_service 5 + task_service 15）
 
 | 测试 | 覆盖点 |
 |------|--------|
@@ -63,41 +64,35 @@
 | `build_status_*`(3 项) | FaithStatus 构建：含 armor 字段 / 零 armor / progress_to_next 正确 |
 | ……(其余 19 项分散于各 service) | 任务生命周期、信仰增量、跨天逻辑等 |
 
-**需补充的测试：**
+**高优先补充：**
 
-- [x] `faith_service::check_in` — 完整签到流程（空用户 / 已有记录 / 跨天）
-- [x] `faith_service::build_status` — FaithStatus 构建（armor 字段 / level 正确）
-- [x] `task_service::complete_task` — 完成任务触发 bonus faith
-- [x] `task_service::abandon_task` — 放弃任务不触发 bonus
-- [x] `task_service::delete_task` — 删除后的级联清理
+- [ ] `task_service::complete_task` — 完成任务触发 bonus faith + **终态幂等保护**
+- [ ] `task_service::start_task` / `resume_task` — **Running 状态幂等 + 终态拒绝**
+- [ ] `task_service::abandon_task` — 放弃任务不触发 bonus
 - [ ] `task_service::is_historical` — 历史日期任务保护
 - [ ] `ledger_service::upsert_daily_record` — 重复 upsert 幂等；减少时为 0；负值保护
 
-### 2.4 Tauri 命令层（共 27 项）
+### 2.4 Tauri 命令层（🔲 待补充，目标 27 项）
 
 | 测试 | 覆盖点 |
 |------|--------|
 | `get_or_create_user` | 新建用户 |
 | `get_status_new_user` | 新用户状态查询 |
-| `create_task` / `create_task_invalid_category` / `create_task_zero_estimated_minutes` / `create_task_with_no_user` | 创建任务的正常 + 错误路径 |
-| `start_task` / `pause_task` / `resume_task` | 任务启停恢复 |
+| `create_task` / `create_task_invalid_category` / `create_task_zero_estimated_minutes` | 创建任务的正常 + 错误路径 |
+| `start_task` / `pause_task` / `resume_task` | 任务启停恢复（含幂等/终态拒绝） |
 | `task_lifecycle_workflow` | 完整生命周期 |
 | `complete_task_command` / `abandon_task_command` / `delete_task_command` | 完成 / 放弃 / 删除 |
-| `start_nonexistent_task` / `complete_nonexistent_task` / `abandon_nonexistent_task` / `delete_nonexistent_task` | 不存在任务的错误路径 |
-| `update_task_title` / `update_task_invalid_status` | 更新字段与非法 status |
 | `check_in_normal` / `check_in_duplicate_overwrites` | 签到 + 重复签到覆盖 |
-| `get_daily_stats_command` | 日统计 |
-| `is_process_running_returns_bool` / `is_process_running_non_windows` | 进程检查跨平台 |
-| `list_processes_returns_vec` / `list_processes_case_insensitive` / `list_processes_no_match` | 进程列表 |
+| `get_daily_stats_command` | 日统计（含 `cumulative_faith`） |
+| `is_process_running` / `list_processes` | 进程检测 |
 
-**需补充的测试：**
+**高优先补充：**
 
-- [x] `check_in` 命令 — 正常签到 / 重复签到
-- [x] `get_daily_stats` 命令 — 日统计
-- [x] `update_task` — 更新标题/描述/预估时间
-- [x] `complete_task` / `abandon_task` / `delete_task`
-- [x] 主要命令的错误路径 — 无效参数 / 不存在的任务 / 不存在的用户
-- [x] `is_process_running` — 非 Windows 平台错误处理
+- [ ] `start_task` 幂等 — 重复调用不创建多条 session
+- [ ] `resume_task` 幂等 — 同上
+- [ ] `complete_task` 终态拒绝 — 已完成/已放弃任务返回错误
+- [ ] `complete_task` / `abandon_task` / `delete_task` 错误路径
+- [ ] `update_task` — 更新各字段
 
 ---
 

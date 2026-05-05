@@ -84,6 +84,20 @@ export interface ProcessInfo {
   status: string;
 }
 
+export interface DailyStats {
+  date: string;
+  work_minutes: number;
+  study_minutes: number;
+  survival_faith: number;
+  progress_faith: number;
+  discipline_faith: number;
+  total_faith: number;
+  task_bonus_work: number;
+  task_bonus_study: number;
+  tasks_completed: number;
+  cumulative_faith: number;
+}
+
 export interface FaithTransaction {
   id: number | null;
   user_id: string;

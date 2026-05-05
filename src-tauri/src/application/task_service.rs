@@ -242,6 +242,14 @@ impl TaskService {
         let real_id = self.materialize_if_virtual(id)?;
         let mut task = self.db.get_by_id(&real_id)?.ok_or("Task not found".to_string())?;
 
+        match task.status {
+            TaskStatus::Running => return Ok(task),
+            TaskStatus::Completed | TaskStatus::Abandoned => {
+                return Err("task is already in terminal state".into());
+            }
+            _ => {}
+        }
+
         task.status = TaskStatus::Running;
         let now = Self::now_str();
         task.started_at = Some(now.clone());
@@ -297,6 +305,15 @@ impl TaskService {
 
     pub fn resume_task(&self, id: &str) -> Result<Task, String> {
         let mut task = self.db.get_by_id(id)?.ok_or("Task not found".to_string())?;
+
+        match task.status {
+            TaskStatus::Running => return Ok(task),
+            TaskStatus::Completed | TaskStatus::Abandoned => {
+                return Err("task is already in terminal state".into());
+            }
+            _ => {}
+        }
+
         let now = Self::now_str();
         task.status = TaskStatus::Running;
         task.started_at = Some(now.clone());
@@ -325,6 +342,13 @@ impl TaskService {
         }
 
         let mut task = self.db.get_by_id(id)?.ok_or("Task not found".to_string())?;
+
+        match task.status {
+            TaskStatus::Completed | TaskStatus::Abandoned => {
+                return Err("task is already in terminal state".into());
+            }
+            _ => {}
+        }
 
         if Self::is_historical(&task.date) {
             return Err("cannot modify historical task".into());

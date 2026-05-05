@@ -78,6 +78,21 @@ pub struct ProcessInfo {
     pub status: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DailyStats {
+    pub date: String,
+    pub work_minutes: i32,
+    pub study_minutes: i32,
+    pub survival_faith: i32,
+    pub progress_faith: i32,
+    pub discipline_faith: i32,
+    pub total_faith: i32,
+    pub task_bonus_work: i32,
+    pub task_bonus_study: i32,
+    pub tasks_completed: i32,
+    pub cumulative_faith: i64,
+}
+
 #[derive(Debug, Clone)]
 pub struct DisciplineInput {
     pub break_count: i32,

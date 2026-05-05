@@ -36,19 +36,23 @@ fn main() {
     let port: u16 = 23456;
     let token = uuid::Uuid::new_v4().to_string().replace("-", "");
 
-    {
-        let data_dir = dirs::data_local_dir()
-            .map(|d| d.join("牛马信仰"))
-            .unwrap_or_else(|| std::path::PathBuf::from("."));
-        std::fs::create_dir_all(&data_dir).ok();
-        std::fs::write(data_dir.join("http_port.txt"), port.to_string()).ok();
-        std::fs::write(data_dir.join("http_token.txt"), &token).ok();
-    }
-
     let server_state = app_state.clone();
     std::thread::spawn(move || {
-        let server = niuma_faith_lib::local_server::LocalHttpServer::new(server_state, port, token);
-        server.run();
+        match niuma_faith_lib::local_server::LocalHttpServer::try_bind(port) {
+            Ok(server) => {
+                let data_dir = dirs::data_local_dir()
+                    .map(|d| d.join("牛马信仰"))
+                    .unwrap_or_else(|| std::path::PathBuf::from("."));
+                std::fs::create_dir_all(&data_dir).ok();
+                std::fs::write(data_dir.join("http_port.txt"), port.to_string()).ok();
+                std::fs::write(data_dir.join("http_token.txt"), &token).ok();
+
+                niuma_faith_lib::local_server::LocalHttpServer::serve(server, server_state, token, port);
+            }
+            Err(e) => {
+                tracing::warn!("{}", e);
+            }
+        }
     });
 
     tauri::Builder::default()

@@ -1,4 +1,4 @@
-import type { Task, TaskCompleteResult } from '@/types';
+import type { Task, TaskCompleteResult, DailyStats } from '@/types';
 import { safeInvoke } from './mock-invoke';
 const UID = 'default_user';
 
@@ -54,6 +54,6 @@ export function invoke_set_task_recurrence(id: string, kind: string): Promise<Ta
   return safeInvoke('set_task_recurrence', { id, kind });
 }
 
-export function invoke_get_daily_stats(date: string): Promise<any> {
+export function invoke_get_daily_stats(date: string): Promise<DailyStats | null> {
   return safeInvoke('get_daily_stats', { userId: UID, date });
 }
