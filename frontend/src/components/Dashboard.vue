@@ -13,6 +13,7 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import CalendarView from './CalendarView.vue';
 import StatusPanel from './StatusPanel.vue';
 import FaithDashboard from './FaithDashboard.vue';
@@ -21,8 +22,13 @@ import TaskList from './TaskList.vue';
 import { useTaskStore } from '@/stores/task';
 
 const task = useTaskStore();
+
+onMounted(() => {
+  task.loadTasksByDate(new Date().toISOString().slice(0, 10));
+});
+
 function onDateSelect(date: string) {
-  task.selectedDate = date;
+  task.loadTasksByDate(date);
 }
 </script>
 
