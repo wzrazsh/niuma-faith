@@ -20,7 +20,7 @@ This directory is the context-control layer for AI-assisted development. Keep do
 | `data-model.md` | Complete database schema, DDL, and migration rules |
 | `api-contract.md` | Frontend/backend API contracts and Tauri commands |
 | `workflows.md` | Core business processes, task lifecycle, check-in, and scoring flows |
-| `ui-spec.md` | UI components and interaction specifications |
+| — | （UI 规范已合并至 design-doc.md §8） |
 | `build-guide.md` | Build, restore, and local verification guide |
 | `decisions.md` | Architecture Decision Records; accepted and rejected design choices |
 | `ai-collaboration.md` | AI collaboration rules, red lines, and required reading order |
@@ -55,7 +55,7 @@ Before changing code, read:
 6. The domain-specific document for the change:
    - API/IPC: `api-contract.md`
    - Database: `data-model.md`
-   - UI: `ui-spec.md`
+   - UI: `design-doc.md` §3, §8
    - Business flow: `workflows.md`
    - Architecture: `design-doc.md`
    - Test/validation: `test-plan.md` and `testing/`

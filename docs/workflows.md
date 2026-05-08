@@ -294,7 +294,8 @@
        ├─ Paused（之前移过来的）→ 暂停中
        └─ Completed/Abandoned → 已完成
     4. 为每个任务创建 KanbanCard，存入 cards Map
-    5. 恢复 activeTimers（Running 任务启动 setInterval）
+    5. 调和（reconcile）：遍历已有任务，如真实 status 映射的列与 localStorage 列不一致，迁移到正确列
+    6. 恢复 activeTimers（Running 任务启动 setInterval）
 [UI] KanbanColumn 按 category 分组渲染泳道
     columnSwimlanes(columnId) → SwimlaneGroup[]
     └─ 每列内按 work/study/other 显示 工作/学习/其他 分组，空组自动隐藏
@@ -303,16 +304,30 @@
 ### 5.2 拖拽移动卡片
 
 ```
-[前端] KanbanCard.vue dragstart → 记录 draggedCardId
-[前端] KanbanColumn.vue @drop
+[前端] KanbanCard.vue dragstart → 设置 text/plain 为 cardId
+[前端] KanbanColumn.vue @drop → 计算目标插入位置（getDropIndex）
     ↓
 [Store] kanban.ts moveCard(cardId, targetColumnId, targetIndex)
     1. 查卡片旧列
-    2. 从旧列 taskIds 中移除
-    3. 插入新列 taskIds 的 targetIndex 位置
-    4. 更新 card.columnId = targetColumnId
-    5. 更新 card.orderInColumn（重新计算该列所有卡片顺序）
-    6. kanban-api.ts saveConfig({columns}) → localStorage
+    2. 判断是否同列移动：
+       ├─ 同列：只重新排序 taskIds → saveConfig → 结束
+       └─ 跨列 ↓
+    3. 从旧列 taskIds 中移除
+    4. 插入新列 taskIds 的 targetIndex 位置
+    5. 更新 card.columnId = targetColumnId
+    6. saveConfig({columns}) → localStorage
+    7. 保护检查：
+       ├─ 历史日期任务（task.date < selectedDate）→ 跳过同步
+       ├─ 项目任务（task_type === 'project'）→ 跳过同步
+       └─ 虚拟每日任务（id 以 'daily:' 开头）→ 跳过同步
+    8. 竞态序号 +1（per-task dragSeq）
+    9. 根据目标列调用对应业务命令：
+       ├─ todo / paused → taskStore.pauseTask(cardId)
+       ├─ inprogress → taskStore.startTask(cardId)
+       └─ done → taskStore.completeTask(cardId, actualMinutes ?? estimatedMinutes)
+   10. 异步等待后端响应：
+       ├─ 成功: 检查序号，只接受最新操作
+       └─ 失败: 回滚卡片到原始列 + saveConfig
     ↓
 [前端] 重新渲染看板
 ```

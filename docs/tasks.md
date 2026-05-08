@@ -22,8 +22,8 @@
 | 信仰积分与 15 级等级系统 | Implemented | `workflows.md`, `domain/level.rs` |
 | 任务生命周期 | Implemented | `api-contract.md`, `workflows.md` |
 | 历史日期保护 | Implemented | `workflows.md`, `ai-collaboration.md` |
-| 日历月/周/日视图 | Implemented | `ui-spec.md`, `README.md` |
-| 看板与任务卡片 | Implemented | `ui-spec.md`, `README.md` |
+| 日历月/周/日视图 | Implemented | `design-doc.md`, `README.md` |
+| 看板与任务卡片 | Implemented | `design-doc.md`, `README.md` |
 | Windows 进程绑定 | Implemented | `README.md`, `design-doc.md` |
 | 浏览器 Mock 运行时 | Implemented | `ai-collaboration.md`, `frontend/src/api/mock-invoke.ts` |
 
@@ -31,6 +31,16 @@
 
 ### P0
 
+- [ ] 看板拖拽状态同步 [Implemented]
+  - 验收：拖拽到默认列（todo/inprogress/paused/done），用对应业务命令（start/pause/complete_task）同步后端。
+  - 验收：同列内拖拽不触发不必要的后端调用。
+  - 验收：loadBoard reconcile 使后端 status 覆盖 localStorage 列位置。
+  - 验收：历史日期/项目/虚拟任务拖拽时静默跳过。
+  - 验收：终态任务（completed/abandoned）拖回 inprogress 被保护。
+  - 验收：快速连续拖拽最终状态正确（last-user-action-wins）。
+  - 验收：后端拒绝后 UI 回滚到原始列。
+  - 关联测试用例：`docs/testing/test-cases/kanban-process-binding.md#tc-kanban-006 ~ tc-kanban-014`
+  - 参考设计：`docs/2026-05-06-kanban-drag-status-sync-plan.md`
 - [ ] 保持 Mock 与 Tauri 命令契约一致 [Planned]
   - 验收：`frontend/src/api/mock-invoke.ts` 的返回字段、错误语义与 `api-contract.md` 一致。
   - 验收：等级阈值使用 v2.0 x10 表。
@@ -56,7 +66,7 @@
   - 验收：看板拖拽、计时器、绑定/解绑进程均有测试用例或手动 smoke。
   - 关联测试用例：`docs/testing/test-cases/kanban-process-binding.md`
 - [ ] UI 行为变更同步文档 [Planned]
-  - 验收：组件布局或交互变化同步更新 `ui-spec.md` 和必要测试用例。
+  - 验收：组件布局或交互变化同步更新 `design-doc.md` 和必要测试用例。
 
 ### P2
 

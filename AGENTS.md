@@ -14,7 +14,7 @@ Design specifications, requirements documents, and task documentation for the �
 | `data-model.md` | Complete database schema (5 tables, DDL, migrations) |
 | `api-contract.md` | Frontend↔Backend API contracts (25 Tauri commands) |
 | `workflows.md` | Core business processes (check-in, task lifecycle, etc.) |
-| `ui-spec.md` | UI components and interaction specifications |
+| — | （UI 规范已合并至 design-doc.md §8） |
 | `build-guide.md` | Build and restore guide |
 | `decisions.md` | Architecture Decision Records (ADR-001 ~ ADR-010) |
 | `ai-collaboration.md` | AI collaboration rules and red lines |

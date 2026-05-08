@@ -9,3 +9,5 @@ playwright.config.ts
 compare-images.ps1
 compare-screenshots.ps1
 .uploads
+.omc
+.opencode

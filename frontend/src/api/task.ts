@@ -19,7 +19,7 @@ export function invoke_get_task(id: string): Promise<Task | null> {
 }
 
 export function invoke_update_task(id: string, title?: string, description?: string, category?: string, estimatedMinutes?: number, actualMinutes?: number, notes?: string, status?: string): Promise<Task> {
-  return safeInvoke('update_task', { id, title: title || null, description: description || null, category: category || null, estimatedMinutes: estimatedMinutes ?? null, actualMinutes: actualMinutes ?? null, notes: notes || null, status: status || null });
+  return safeInvoke('update_task', { id, title: title ?? undefined, description: description ?? undefined, category: category ?? undefined, estimatedMinutes: estimatedMinutes ?? undefined, actualMinutes: actualMinutes ?? undefined, notes: notes ?? undefined, status: status ?? undefined });
 }
 
 export function invoke_complete_task(id: string, actualMinutes: number): Promise<TaskCompleteResult> {

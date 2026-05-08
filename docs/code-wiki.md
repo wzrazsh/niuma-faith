@@ -95,7 +95,6 @@ niuma-faith/
     ├── design-doc.md
     ├── api-contract.md
     ├── data-model.md
-    ├── ui-spec.md
     ├── workflows.md
     └── ... (其他文档)
 ```

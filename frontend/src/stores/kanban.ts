@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { KanbanColumn, KanbanCard, BoardConfig, SwimlaneGroup } from '@/types/kanban';
-import type { Task } from '@/types';
+import type { Task, TaskStatus } from '@/types';
 import { useTaskStore } from './task';
 
 const DEFAULT_COLUMNS: KanbanColumn[] = [
@@ -32,6 +32,7 @@ export const useKanbanStore = defineStore('kanban', () => {
   const cards = ref<Map<string, KanbanCard>>(new Map());
   const activeTimers = ref<Map<string, number>>(new Map());
   const isLoading = ref(false);
+  const dragSeq = ref<Map<string, number>>(new Map());
 
   const taskMap = computed(() => {
     const taskStore = useTaskStore();
@@ -85,6 +86,25 @@ export const useKanbanStore = defineStore('kanban', () => {
           cards.value.set(task.id, { taskId: task.id, columnId: colId, orderInColumn: col.taskIds.length - 1 });
         }
       }
+
+      for (const col of columns.value) {
+        for (let i = col.taskIds.length - 1; i >= 0; i--) {
+          const id = col.taskIds[i];
+          const task = taskStore.tasks.find(t => t.id === id);
+          if (!task) continue;
+          const expectedColId = mapStatusToColumn(task.status);
+          if (expectedColId !== col.id) {
+            col.taskIds.splice(i, 1);
+            const targetCol = columns.value.find(c => c.id === expectedColId);
+            if (targetCol) {
+              targetCol.taskIds.push(id);
+            } else {
+              const fallback = columns.value.find(c => c.id === 'todo');
+              if (fallback) fallback.taskIds.push(id);
+            }
+          }
+        }
+      }
       saveConfig({ columns: columns.value });
     } catch (e: any) {
       console.error('[kanban] loadBoard failed:', e);
@@ -118,14 +138,78 @@ export const useKanbanStore = defineStore('kanban', () => {
   function moveCard(cardId: string, targetColumnId: string, targetIndex: number) {
     const card = cards.value.get(cardId);
     if (!card) return;
+
     const sourceCol = columns.value.find(c => c.id === card.columnId);
     const targetCol = columns.value.find(c => c.id === targetColumnId);
     if (!sourceCol || !targetCol) return;
+
+    if (sourceCol.id === targetCol.id) {
+      sourceCol.taskIds = sourceCol.taskIds.filter(id => id !== cardId);
+      sourceCol.taskIds.splice(targetIndex, 0, cardId);
+      saveConfig({ columns: columns.value });
+      return;
+    }
+
     sourceCol.taskIds = sourceCol.taskIds.filter(id => id !== cardId);
     targetCol.taskIds.splice(targetIndex, 0, cardId);
+    const originalColumnId = card.columnId;
     card.columnId = targetColumnId;
     cards.value.set(cardId, card);
     saveConfig({ columns: columns.value });
+
+    const taskStore = useTaskStore();
+    const task = taskStore.tasks.find(t => t.id === cardId);
+    if (!task) return;
+    if (task.date < taskStore.selectedDate) return;
+    if (task.task_type === 'project') return;
+    if (task.id.startsWith('daily:')) return;
+
+    const seq = (dragSeq.value.get(cardId) ?? 0) + 1;
+    dragSeq.value.set(cardId, seq);
+
+    syncTaskStatus(cardId, targetColumnId, originalColumnId, task, seq);
+  }
+
+  function syncTaskStatus(cardId: string, columnId: string, originalColumnId: string, task: Task, seq: number) {
+    const taskStore = useTaskStore();
+    let promise: Promise<any>;
+
+    switch (columnId) {
+      case 'inprogress':
+        if (task.status === 'completed' || task.status === 'abandoned') return;
+        promise = taskStore.startTask(cardId);
+        break;
+      case 'paused':
+      case 'todo':
+        promise = taskStore.pauseTask(cardId);
+        break;
+      case 'done':
+        promise = taskStore.completeTask(cardId, task.actual_minutes || task.estimated_minutes);
+        break;
+      default:
+        return;
+    }
+
+    promise.then(() => {
+      const current = dragSeq.value.get(cardId);
+      if (current !== undefined && current <= seq) {
+        dragSeq.value.delete(cardId);
+      }
+    }).catch(() => {
+      const current = dragSeq.value.get(cardId);
+      if (current === seq) {
+        const curCol = columns.value.find(c => c.id === columnId);
+        const origCol = columns.value.find(c => c.id === originalColumnId);
+        if (curCol && origCol) {
+          curCol.taskIds = curCol.taskIds.filter(id => id !== cardId);
+          origCol.taskIds.push(cardId);
+          const c = cards.value.get(cardId);
+          if (c) { c.columnId = originalColumnId; cards.value.set(cardId, c); }
+          saveConfig({ columns: columns.value });
+        }
+        dragSeq.value.delete(cardId);
+      }
+    });
   }
 
   function addCard(columnId: string, taskId: string) {

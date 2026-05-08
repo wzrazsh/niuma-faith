@@ -1,6 +1,6 @@
 # 牛马信仰 — 系统设计文档
 
-> 本文档是系统的「单一事实来源」。删除全部代码后，仅凭本文档 + data-model.md + api-contract.md 即可还原整个系统。
+> 本文档是系统的「单一事实来源」。删除全部代码后，仅凭本文档 + data-model.md + api-contract.md + ui-spec.md 即可还原整个系统。
 
 ## 1. 系统全景
 
@@ -479,95 +479,37 @@ calc_task_bonus(category, actual_minutes):
 
 ## 8. 配置与常量
 
-### 8.1 CSS 变量（style.css，暗金主题 v2）
+### 8.1 CSS 变量（style.css）
 
 ```css
 :root {
-  /* 背景色系 */
-  --color-bg: #0c0c16;                /* 主背景 */
-  --color-bg-alt: #111122;            /* 交替背景 */
-  --color-surface: #16162a;           /* 面板表面 */
-  --color-surface-hover: #1e1e38;     /* 悬停表面 */
-  --color-surface-raised: #1e1e3a;    /* 浮起表面 */
-
-  /* 边框 */
-  --color-border: #2a2a4a;            /* 主边框 */
-  --color-border-subtle: #1e1e36;     /* 微妙边框 */
-
-  /* 文本 */
-  --color-text: #e4ddd0;              /* 主文本 */
-  --color-text-muted: #7a7a9a;        /* 次文本 */
-  --color-text-dim: #555570;          /* 淡化文本 */
-
-  /* 主题色 */
-  --color-primary: #ffd700;           /* 金色 */
-  --color-primary-dim: #b8860b;       /* 暗金 */
-  --color-primary-glow: rgba(255, 215, 0, 0.12);
-  --color-primary-glow-strong: rgba(255, 215, 0, 0.25);
-
-  /* 语义色 */
+  --color-bg: #1a1a24;
+  --color-surface: #222233;
+  --color-surface-hover: #2a2a3e;
+  --color-border: #333344;
+  --color-text: #e0e0e0;
+  --color-text-muted: #888899;
+  --color-primary: #ffd700;    /* 金色 */
+  --color-primary-dim: #b8860b;
   --color-success: #4ade80;
-  --color-success-dim: #166534;
   --color-danger: #ef4444;
-  --color-danger-dim: #7f1d1d;
-  --color-work: #fb7185;              /* 工作标签 */
-  --color-study: #60a5fa;             /* 学习标签 */
-  --color-other: #a78bfa;             /* 其他标签 */
-
-  /* 字体 */
-  --font-display: 'Noto Serif SC', serif;
-  --font-body: 'Plus Jakarta Sans', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-
-  /* 圆角 */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-
-  /* 阴影 */
-  --shadow-panel: 0 2px 20px rgba(0,0,0,0.3);
-  --shadow-glow: 0 0 20px var(--color-primary-glow);
-
-  /* 过渡 */
-  --transition-fast: 0.15s cubic-bezier(0.4,0,0.2,1);
-  --transition-normal: 0.25s cubic-bezier(0.4,0,0.2,1);
-  --transition-slow: 0.4s cubic-bezier(0.4,0,0.2,1);
 }
 ```
-### 8.2 任务状态色指示
 
-| 状态 | 颜色 | 说明 |
-|------|------|------|
-| running | `#ffd700` (金) + glow | 进行中，脉冲发光 |
-| paused | `#555570` (灰) | 暂停 |
-| completed | `#4ade80` (绿) | 已完成 |
-| abandoned | `#ef4444` (红) | 已放弃 |
-
-### 8.3 进程检测轮询间隔
+### 8.2 进程检测轮询间隔
 
 ```typescript
 // process-detector.ts
 const POLL_INTERVAL_MS = 3000;  // 3 秒
 ```
 
-### 8.4 提醒检查间隔
+### 8.3 提醒检查间隔
 
 ```typescript
 // reminder-service.ts
 const REMINDER_INTERVAL_MS = 60000;  // 1 分钟
 ```
 
-### 8.5 关键布局常量
-
-| 常量 | 值 |
-|------|----|
-| nav-bar 高度 | 44px |
-| sidebar 宽度 | 320px |
-| 看板列宽 | min 260px, max 300px |
-| 悬浮窗尺寸 | 80×80px |
-| 组件间距 | 14-18px |
-
 ---
 
-> **文档关联**: data-model.md ← 数据库完整 Schema | api-contract.md ← 全部命令签名 | workflows.md ← 业务流程 | build-guide.md ← 构建还原步骤
+> **文档关联**: data-model.md ← 数据库完整 Schema | api-contract.md ← 全部命令签名 | ui-spec.md ← 组件与交互细节 | workflows.md ← 业务流程 | build-guide.md ← 构建还原步骤

@@ -1,6 +1,13 @@
 # 牛马信仰 — Changelog
 
-> 本文档记录设计和实现层面的重要变化，服务于下一轮 AI 协作快速恢复上下文。细节契约仍以 `api-contract.md`、`data-model.md`、`workflows.md`、`ui-spec.md` 为准。
+> 本文档记录设计和实现层面的重要变化，服务于下一轮 AI 协作快速恢复上下文。细节契约仍以 `api-contract.md`、`data-model.md`、`workflows.md`、`design-doc.md` 为准。
+
+## 2026-05-08
+
+### Documentation
+
+- **合并 `ui-spec.md` 入 `design-doc.md`**: `ui-spec.md` 已归档至 `docs/archive/ui-spec-2026-05-08.md`，其 CSS 变量、任务状态色、布局常量等内容合并到 `design-doc.md` §8，消除两个文档间 CSS 变量不一致（`design-doc.md` 原有过时的 v1 调色板）。
+- 更新 `AGENTS.md`、`docs/AGENTS.md`、`ai-collaboration.md`、`tasks.md`、`changelog.md`、`code-wiki.md` 中 11 处 `ui-spec.md` 引用，指向 `design-doc.md`。
 
 ## 2026-05-06
 

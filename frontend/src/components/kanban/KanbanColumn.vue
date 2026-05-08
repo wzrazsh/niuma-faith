@@ -43,10 +43,19 @@ function onDrop(e: DragEvent) {
   dragOver.value = false;
   const cardId = e.dataTransfer?.getData('text/plain');
   if (cardId) {
-    const col = kanban.columns.find(c => c.id === props.column.id);
-    const targetIndex = col ? col.taskIds.length : 0;
+    const targetIndex = getDropIndex(e);
     kanban.moveCard(cardId, props.column.id, targetIndex);
   }
+}
+
+function getDropIndex(e: DragEvent): number {
+  const cardEls = (e.currentTarget as HTMLElement).querySelectorAll('.card');
+  const mouseY = e.clientY;
+  for (let i = 0; i < cardEls.length; i++) {
+    const rect = cardEls[i].getBoundingClientRect();
+    if (mouseY < rect.top + rect.height / 2) return i;
+  }
+  return cardEls.length;
 }
 </script>
 
