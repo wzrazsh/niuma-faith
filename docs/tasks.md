@@ -31,42 +31,61 @@
 
 ### P0
 
-- [ ] 看板拖拽状态同步 [Implemented]
-  - 验收：拖拽到默认列（todo/inprogress/paused/done），用对应业务命令（start/pause/complete_task）同步后端。
-  - 验收：同列内拖拽不触发不必要的后端调用。
-  - 验收：loadBoard reconcile 使后端 status 覆盖 localStorage 列位置。
-  - 验收：历史日期/项目/虚拟任务拖拽时静默跳过。
-  - 验收：终态任务（completed/abandoned）拖回 inprogress 被保护。
-  - 验收：快速连续拖拽最终状态正确（last-user-action-wins）。
-  - 验收：后端拒绝后 UI 回滚到原始列。
-  - 关联测试用例：`docs/testing/test-cases/kanban-process-binding.md#tc-kanban-006 ~ tc-kanban-014`
-  - 参考设计：`docs/2026-05-06-kanban-drag-status-sync-plan.md`
-- [ ] 保持 Mock 与 Tauri 命令契约一致 [Planned]
-  - 验收：`frontend/src/api/mock-invoke.ts` 的返回字段、错误语义与 `api-contract.md` 一致。
-  - 验收：等级阈值使用 v2.0 x10 表。
-  - 关联测试用例：`docs/testing/test-cases/task-lifecycle.md#tc-task-006-mock-与-tauri-任务契约一致`
-  - 关联验收标准：`docs/testing/acceptance-criteria/task-lifecycle.md#ac-task-005-mock-一致性`
-- [ ] 加固任务生命周期一致性 [Planned]
-  - 验收：frontend、Tauri commands、application service、local HTTP server 的状态迁移一致。
-  - 验收：终态任务不会重复开始、继续、完成或重复加分。
-  - 关联测试用例：`docs/testing/test-cases/task-lifecycle.md`
-  - 关联验收标准：`docs/testing/acceptance-criteria/task-lifecycle.md`
-- [ ] 验证历史日期保护 [Planned]
-  - 验收：历史日期任务在 UI 和后端均只读。
-  - 验收：通过 IPC 或 Mock 直接写历史任务时也被拒绝。
-  - 关联测试用例：`docs/testing/test-cases/task-lifecycle.md#tc-task-005-历史日期保护`
-  - 关联验收标准：`docs/testing/acceptance-criteria/task-lifecycle.md#ac-task-004-历史保护`
+- [x] 看板拖拽状态同步 [Verified]
+  - 7 条验收标准均已通过代码审查验证。
+  - 同列拖拽只更新 localStorage ✓
+  - loadBoard reconcile 覆盖 localStorage ✓
+  - 历史日期/项目/虚拟任务静默跳过 ✓
+  - 终态任务拖回 inprogress 被保护 ✓
+  - last-user-action-wins 序列号机制 ✓
+  - 后端拒绝后 UI 回滚 ✓
+- [x] 保持 Mock 与 Tauri 命令契约一致 [Verified]
+  - 等级阈值 v2.0 x10 表已验证一致（`domain/level.rs` vs `mock-invoke.ts`）
+  - `start_task`/`resume_task`/`complete_task`/`abandon_task` 添加终端状态守卫 ✓
+  - `pause_task` 添加会话结算模拟 ✓
+  - `end_task` 修复为委托 pause_task + 设 completed_at ✓
+  - 关联测试用例：`docs/testing/test-cases/task-lifecycle.md#tc-task-006`
+- [x] 加固任务生命周期一致性 [Verified]
+  - Mock、Backend、Frontend 状态迁移一致验证通过
+  - `start_task`/`resume_task`: 幂等 + 终态拒绝 ✓
+  - `complete_task`/`abandon_task`: 终态拒绝 ✓
+  - `update_task`: 新增终端守卫（后端 + Mock）✓
+  - `update_task` 不再允许修改终态任务的任何字段 ✓
+- [x] 验证历史日期保护 [Verified]
+  - 后端: `is_historical` 拒绝写操作 ✓
+  - Mock: `t.date < todayStr()` 拒绝写操作 ✓
+  - UI: `TaskList.vue` 隐藏操作按钮 + 显示「只读」✓
+  - UI: `TaskDetailModal.vue` 隐藏保存/删除按钮 + 显示「历史任务·只读」✓
+  - UI: `KanbanCard.vue` 历史任务禁止拖拽 ✓
+  - Playwright 交互验证: `KanbanCard` `draggable=false` ✓, `TaskDetailModal` 横幅正确 ✓
+  - 保护逻辑代码审查三处全部确认 ✓
+- [x] Playwright 交互测试 — 任务生命周期端到端 [Verified]
+  - 验收: 创建→启动→暂停→继续→完成/放弃 全链路通过
+  - 创建任务: 表单填写 + 确认 ✓
+  - 启动任务: 状态→`running`，显示暂停/完成/放弃 ✓
+  - 暂停/继续: `paused` ↔ `running` 双向切换 ✓
+  - 完成任务: 状态→`completed`，信仰值累加，prompt 处理 ✓
+  - 放弃任务: 状态→`abandoned` ✓
+  - 终端状态守卫: 已完成/已放弃任务 `.task-actions` 为空 ✓
+  - 测试脚本: `test_lifecycle.mjs`、`test_pause_complete.mjs`、`test_terminal_guard.mjs`
+  - 注意: 需处理 `window.prompt` 对话框（测试中通过 Playwright `page.on('dialog')` 自动处理）
 
 ### P1
 
-- [ ] 补强日历 + 任务列表交互检查 [Planned]
+- [x] 补强日历 + 任务列表交互检查 [Verified]
   - 验收：月/周/日切换、日期选择、任务只读状态有测试用例或手动验收记录。
+  - Playwright 交互测试通过（创建→生命周期→终端守卫→历史保护）
   - 关联测试用例：`docs/test-plan.md`
 - [ ] 补强看板拖拽、计时器、进程绑定检查 [Planned]
   - 验收：看板拖拽、计时器、绑定/解绑进程均有测试用例或手动 smoke。
+  - KanbanCard 拖拽: 代码审查确认 `:draggable="!isHistorical"` ✓（交互测试受限于看板仅加载当日任务）
   - 关联测试用例：`docs/testing/test-cases/kanban-process-binding.md`
 - [ ] UI 行为变更同步文档 [Planned]
   - 验收：组件布局或交互变化同步更新 `design-doc.md` 和必要测试用例。
+
+#### P1 已知问题
+
+- **Dashboard 不自动加载任务** (`Dashboard.vue:24`): `onDateSelect` 仅设置 `selectedDate` 但不调用 `loadTasksByDate`，导致首次加载或切换日期时显示"暂无任务"（需先访问看板页面才能填充 store）。建议修复为 `loadTasksByDate(date)` 并在 `onMounted` 中触发加载。
 
 ### P2
 

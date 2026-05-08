@@ -22,6 +22,14 @@ impl SqliteDb {
         })
     }
 
+    pub fn open_in_memory() -> Result<Self, String> {
+        let conn = Connection::open(":memory:").map_err(|e| e.to_string())?;
+        init_schema(&conn).map_err(|e| e.to_string())?;
+        Ok(SqliteDb {
+            conn: Mutex::new(conn),
+        })
+    }
+
     pub fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
         self.conn.lock().unwrap()
     }

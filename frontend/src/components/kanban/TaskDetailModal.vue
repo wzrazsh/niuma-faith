@@ -44,18 +44,20 @@
           </div>
         </div>
         <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
+      <div v-if="isHistorical" class="historical-banner">历史任务 · 只读</div>
       </div>
       <div class="modal-footer">
-        <button class="modal-danger" @click="handleDelete">删除</button>
+        <button v-if="!isHistorical" class="modal-danger" @click="handleDelete">删除</button>
         <button class="modal-cancel" @click="$emit('close')">取消</button>
-        <button class="primary" @click="handleSave" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
+        <button v-if="!isHistorical" class="primary" @click="handleSave" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
+        <button v-else class="primary" @click="$emit('close')">关闭</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
 import type { Task } from '@/types';
 import { useTaskStore } from '@/stores/task';
 import { useFaithStore } from '@/stores/faith';
@@ -67,6 +69,12 @@ const taskStore = useTaskStore();
 const faith = useFaithStore();
 const saving = ref(false);
 const errorMsg = ref('');
+
+const isHistorical = computed(() => {
+  if (!task.value) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return task.value.date < today;
+});
 
 const task = ref<Task | null>(null);
 const form = reactive({ title: '', description: '', category: 'work', estimated: 30, actual: 0, status: 'paused' });
@@ -244,6 +252,16 @@ async function handleDelete() {
   padding: 6px 10px;
   background: var(--color-danger-dim);
   border-radius: var(--radius-sm);
+}
+
+.historical-banner {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  padding: 6px 10px;
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  text-align: center;
 }
 
 @keyframes fade-in {

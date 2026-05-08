@@ -99,6 +99,43 @@ mod tests {
     }
 
     #[test]
+    fn test_calc_progress_bounds() {
+        assert_eq!(calc_progress(0), 0);
+        assert_eq!(calc_progress(60), 0);
+        assert_eq!(calc_progress(120), 100);
+        assert_eq!(calc_progress(240), 200);
+        assert_eq!(calc_progress(360), 300);
+        assert_eq!(calc_progress(480), 400);
+        assert_eq!(calc_progress(600), 400);
+    }
+
+    #[test]
+    fn test_calc_discipline_leave_record_invalid() {
+        let input = DisciplineInput {
+            break_count: 0,
+            leave_record: 99,
+            close_record: 0,
+        };
+        let (total, a, b, c) = calc_discipline(&input);
+        assert_eq!(a, 80);
+        assert_eq!(b, 0);
+        assert_eq!(c, 0);
+        assert_eq!(total, 80);
+    }
+
+    #[test]
+    fn test_calc_discipline_leave_record_one() {
+        let input = DisciplineInput {
+            break_count: 0,
+            leave_record: 1,
+            close_record: 0,
+        };
+        let (total, _a, b, _c) = calc_discipline(&input);
+        assert_eq!(b, 30);
+        assert_eq!(total, 110);
+    }
+
+    #[test]
     fn test_calculate_daily_full() {
         let discipline = DisciplineInput {
             break_count: 0,

@@ -1,6 +1,6 @@
 <template>
-  <div class="card" draggable="true" @dragstart="onDragStart"
-    @dblclick="$emit('edit', card.taskId)">
+  <div class="card" :draggable="!isHistorical" @dragstart="onDragStart"
+    @dblclick="isHistorical ? null : $emit('edit', card.taskId)">
     <div class="card-info">
       <span class="card-title">{{ cardTitle }}</span>
       <span v-if="cardDetail" class="card-category" :class="cardDetail.category">
@@ -17,10 +17,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useKanbanStore } from '@/stores/kanban';
+import { useTaskStore } from '@/stores/task';
 
 const props = defineProps<{ card: any; columnId: string }>();
 defineEmits<{ edit: [id: string] }>();
 const kanban = useKanbanStore();
+const taskStore = useTaskStore();
 
 const cardTitle = computed(() => {
   const task = kanban.taskMap[props.card.taskId];
@@ -29,6 +31,12 @@ const cardTitle = computed(() => {
 
 const cardDetail = computed(() => {
   return kanban.taskMap[props.card.taskId] || null;
+});
+
+const isHistorical = computed(() => {
+  const task = kanban.taskMap[props.card.taskId];
+  if (!task) return false;
+  return task.date < taskStore.selectedDate;
 });
 
 const timerRunning = computed(() => {

@@ -99,3 +99,19 @@ pub struct DisciplineInput {
     pub leave_record: i32,
     pub close_record: i32,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_process_info_json_roundtrip() {
+        let info = ProcessInfo { pid: 1234, name: "notepad.exe".into(), status: "running".into() };
+        let json = serde_json::to_string(&info).unwrap();
+        assert_eq!(json, r#"{"pid":1234,"name":"notepad.exe","status":"running"}"#);
+        let deserialized: ProcessInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.pid, 1234);
+        assert_eq!(deserialized.name, "notepad.exe");
+        assert_eq!(deserialized.status, "running");
+    }
+}

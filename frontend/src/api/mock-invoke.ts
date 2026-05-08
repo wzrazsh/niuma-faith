@@ -267,6 +267,7 @@ export const handlers: MockHandlers = {
       if (args.estimatedMinutes <= 0) throw 'estimated_minutes must be > 0';
       t.estimated_minutes = args.estimatedMinutes;
     }
+    if (t.status === 'completed' || t.status === 'abandoned') throw 'task is already in terminal state';
     if (args.actualMinutes !== undefined) t.actual_minutes = args.actualMinutes;
     if (args.notes !== undefined) t.notes = args.notes;
     if (args.status !== undefined) t.status = args.status;
@@ -282,6 +283,7 @@ export const handlers: MockHandlers = {
     const idx = tasks.findIndex(t => t.id === args.id);
     if (idx === -1) throw 'Task not found';
     const t = tasks[idx];
+    if (t.status === 'completed' || t.status === 'abandoned') throw 'task is already in terminal state';
     if (t.date < todayStr()) throw 'cannot modify historical task';
     if (t.task_type === 'project') throw 'project task cannot be modified via UI';
     const bonus = calcTaskBonus(t.category, args.actualMinutes);
@@ -327,6 +329,7 @@ export const handlers: MockHandlers = {
     const tasks = loadTasks();
     const t = tasks.find(t => t.id === args.id);
     if (!t) throw 'Task not found';
+    if (t.status === 'completed' || t.status === 'abandoned') throw 'task is already in terminal state';
     if (t.date < todayStr()) throw 'cannot modify historical task';
     if (t.task_type === 'project') throw 'project task cannot be modified via UI';
     t.status = 'abandoned';
@@ -378,6 +381,8 @@ export const handlers: MockHandlers = {
     const tasks = loadTasks();
     const t = tasks.find(t => t.id === realId);
     if (!t) throw 'Task not found';
+    if (t.status === 'completed' || t.status === 'abandoned') throw 'task is already in terminal state';
+    if (t.status === 'running') return t;
     t.status = 'running';
     t.started_at = nowStr();
     t.updated_at = nowStr();
@@ -389,6 +394,56 @@ export const handlers: MockHandlers = {
     const tasks = loadTasks();
     const t = tasks.find(t => t.id === args.id);
     if (!t) throw 'Task not found';
+    // Simulate session settlement: calculate elapsed time and accumulate to daily record
+    if (t.started_at && t.status === 'running') {
+      const elapsedMs = Date.now() - new Date(t.started_at).getTime();
+      const elapsedSecs = Math.max(0, Math.floor(elapsedMs / 1000));
+      t.duration_seconds = (t.duration_seconds || 0) + elapsedSecs;
+      const minutes = Math.floor(elapsedSecs / 60);
+      if (minutes > 0) {
+        const user = loadUser();
+        const records = loadFaithRecords();
+        const date = t.date || todayStr();
+        const key = `${t.user_id}_${date}`;
+        const old = records[key];
+        const oldWork = old?.work_minutes ?? 0;
+        const oldStudy = old?.study_minutes ?? 0;
+        const [newWork, newStudy] = t.category === 'study'
+          ? [oldWork, oldStudy + minutes]
+          : [oldWork + minutes, oldStudy];
+        const survival = calcSurvivalFaith(newWork);
+        const progress = calcProgressFaith(newStudy);
+        const [discipline, da, db, dc] = calcDiscipline(
+          old?.break_count ?? 0, old?.leave_record ?? 0, old?.close_record ?? 0,
+        );
+        const oldBW = old?.task_bonus_work ?? 0;
+        const oldBS = old?.task_bonus_study ?? 0;
+        const total = survival + progress + discipline + oldBW + oldBS;
+        const oldTotal = old?.total_faith ?? 0;
+        const record: DailyRecord = {
+          id: old?.id ?? null, user_id: t.user_id, date,
+          work_minutes: newWork, study_minutes: newStudy,
+          survival_faith: survival, progress_faith: progress, discipline_faith: discipline,
+          total_faith: total, task_bonus_work: oldBW, task_bonus_study: oldBS,
+          break_count: old?.break_count ?? 0, leave_record: old?.leave_record ?? 0,
+          close_record: old?.close_record ?? 0,
+          discipline_a: da, discipline_b: db, discipline_c: dc,
+          tasks_completed: old?.tasks_completed ?? 0,
+          created_at: old?.created_at ?? nowStr(), updated_at: nowStr(),
+        };
+        records[key] = record;
+        saveFaithRecords(records);
+        const delta = total - oldTotal;
+        if (delta !== 0) {
+          user.cumulative_faith += delta;
+          const lvl = getLevel(user.cumulative_faith);
+          user.current_level = lvl.level;
+          user.armor_points = calcArmor(user.current_level);
+          user.updated_at = nowStr();
+          saveUser(user);
+        }
+      }
+    }
     t.status = 'paused';
     t.updated_at = nowStr();
     saveTasks(tasks);
@@ -399,6 +454,8 @@ export const handlers: MockHandlers = {
     const tasks = loadTasks();
     const t = tasks.find(t => t.id === args.id);
     if (!t) throw 'Task not found';
+    if (t.status === 'completed' || t.status === 'abandoned') throw 'task is already in terminal state';
+    if (t.status === 'running') return t;
     t.status = 'running';
     t.started_at = nowStr();
     t.updated_at = nowStr();
@@ -407,10 +464,13 @@ export const handlers: MockHandlers = {
   },
 
   async end_task(args: { id: string }) {
+    // Delegate to pause_task first to accumulate session time, then mark completed
+    const paused = await this.pause_task(args);
     const tasks = loadTasks();
-    const t = tasks.find(t => t.id === args.id);
+    const t = tasks.find(t => t.id === paused.id);
     if (!t) throw 'Task not found';
     t.status = 'completed';
+    t.completed_at = nowStr();
     t.updated_at = nowStr();
     saveTasks(tasks);
     return t;

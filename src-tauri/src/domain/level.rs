@@ -194,6 +194,20 @@ mod tests {
     }
 
     #[test]
+    fn test_level_thresholds_all_15() {
+        let expected: Vec<(i32, i64)> = vec![
+            (1, 0), (2, 15_000), (3, 40_000), (4, 80_000), (5, 135_000),
+            (6, 205_000), (7, 290_000), (8, 395_000), (9, 520_000), (10, 665_000),
+            (11, 825_000), (12, 945_000), (13, 1_025_000), (14, 1_070_000), (15, 1_095_000),
+        ];
+        assert_eq!(LEVELS.len(), 15);
+        for (i, (lv, th)) in expected.iter().enumerate() {
+            assert_eq!(LEVELS[i].level, *lv, "Level {} wrong level number", lv);
+            assert_eq!(LEVELS[i].threshold, *th, "Level {} wrong threshold", lv);
+        }
+    }
+
+    #[test]
     fn test_calc_armor() {
         assert_eq!(calc_armor(1), 0);
         assert_eq!(calc_armor(3), 2_000);

@@ -23,13 +23,14 @@
             <span>已用{{ t.duration_seconds }}秒</span>
           </span>
         </div>
-        <div class="task-actions">
+        <div class="task-actions" v-if="!isHistorical">
           <button v-if="t.status === 'paused'" @click="task.startTask(t.id)">开始</button>
           <button v-if="t.status === 'running'" class="primary" @click="task.pauseTask(t.id)">暂停</button>
           <button v-if="t.status === 'running'" class="success" @click="onComplete(t)">完成</button>
           <button v-if="t.status === 'running'" class="danger" @click="task.abandonTask(t.id)">放弃</button>
           <button v-if="t.status === 'paused'" class="success" @click="task.resumeTask(t.id)">继续</button>
         </div>
+        <div v-else class="task-historical-badge">只读</div>
       </div>
       <div v-if="task.filteredTasks.length === 0" class="empty">
         <span class="empty-icon">◈</span>
@@ -41,12 +42,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useTaskStore } from '@/stores/task';
 import TaskForm from './TaskForm.vue';
 
 const task = useTaskStore();
 const showForm = ref(false);
+
+const isHistorical = computed(() => task.selectedDate < new Date().toISOString().slice(0, 10));
+
 const tabs = [
   { key: 'all', label: '全部' },
   { key: 'running', label: '进行中' },
@@ -136,6 +140,14 @@ function onComplete(t: any) {
 .indicator-running { background: var(--color-primary); box-shadow: 0 0 8px var(--color-primary-glow); }
 .indicator-completed { background: var(--color-success); }
 .indicator-abandoned { background: var(--color-danger); }
+
+.task-historical-badge {
+  font-size: 0.7rem;
+  color: var(--color-text-dim);
+  border: 1px solid var(--color-border-subtle);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
 
 .task-info {
   display: flex;

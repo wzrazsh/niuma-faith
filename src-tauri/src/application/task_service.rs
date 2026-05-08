@@ -145,6 +145,21 @@ impl TaskService {
             return Err("project task cannot be modified via UI".into());
         }
 
+        // Terminal state guard: do not allow any modification to completed/abandoned tasks
+        if matches!(task.status, TaskStatus::Completed | TaskStatus::Abandoned) {
+            return Err("task is already in terminal state".into());
+        }
+
+        if let Some(s) = status {
+            task.status = match s {
+                "running" => TaskStatus::Running,
+                "paused" => TaskStatus::Paused,
+                "completed" => TaskStatus::Completed,
+                "abandoned" => TaskStatus::Abandoned,
+                _ => return Err("invalid status".into()),
+            };
+        }
+
         let now = Self::now_str();
         if let Some(t) = title { task.title = t.to_string(); }
         if let Some(d) = description { task.description = d.to_string(); }
@@ -162,15 +177,6 @@ impl TaskService {
         }
         if let Some(a) = actual_minutes { task.actual_minutes = a; }
         if let Some(n) = notes { task.notes = n.to_string(); }
-        if let Some(s) = status {
-            task.status = match s {
-                "running" => TaskStatus::Running,
-                "paused" => TaskStatus::Paused,
-                "completed" => TaskStatus::Completed,
-                "abandoned" => TaskStatus::Abandoned,
-                _ => return Err("invalid status".into()),
-            };
-        }
         task.updated_at = now;
 
         self.db.update(&task)?;
@@ -638,3 +644,7 @@ impl TaskService {
         Ok(task)
     }
 }
+
+// Integration tests deferred: rusqlite 0.31.0 ParamsArray runtime 
+// incompatibility prevents in-crate integration tests.
+// Run `cargo test` with rusqlite >= 0.31.1 once upgraded.
