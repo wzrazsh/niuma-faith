@@ -31,6 +31,7 @@ export const useKanbanStore = defineStore('kanban', () => {
   const columns = ref<KanbanColumn[]>([]);
   const cards = ref<Map<string, KanbanCard>>(new Map());
   const activeTimers = ref<Map<string, number>>(new Map());
+  const timerSeconds = ref<Map<string, number>>(new Map());
   const isLoading = ref(false);
   const dragSeq = ref<Map<string, number>>(new Map());
 
@@ -224,13 +225,32 @@ export const useKanbanStore = defineStore('kanban', () => {
   function startTimer(cardId: string) {
     const existing = activeTimers.value.get(cardId);
     if (existing) window.clearInterval(existing);
-    const interval = window.setInterval(() => {}, 1000);
+    if (!timerSeconds.value.has(cardId)) {
+      timerSeconds.value.set(cardId, 0);
+    }
+    const interval = window.setInterval(() => {
+      const current = timerSeconds.value.get(cardId) || 0;
+      timerSeconds.value.set(cardId, current + 1);
+    }, 1000);
     activeTimers.value.set(cardId, interval);
   }
 
   function stopTimer(cardId: string) {
     const interval = activeTimers.value.get(cardId);
     if (interval) { window.clearInterval(interval); activeTimers.value.delete(cardId); }
+  }
+
+  function getTimerDisplay(cardId: string): string {
+    const totalSeconds = timerSeconds.value.get(cardId) || 0;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  function resetTimer(cardId: string) {
+    stopTimer(cardId);
+    timerSeconds.value.delete(cardId);
   }
 
   function addColumn(title: string) {
@@ -261,5 +281,5 @@ export const useKanbanStore = defineStore('kanban', () => {
     loadBoard();
   }
 
-  return { columns, cards, activeTimers, isLoading, taskMap, columnCards, columnSwimlanes, loadBoard, moveCard, addCard, startTimer, stopTimer, addColumn, removeColumn, resetToDefault };
+  return { columns, cards, activeTimers, timerSeconds, isLoading, taskMap, columnCards, columnSwimlanes, loadBoard, moveCard, addCard, startTimer, stopTimer, getTimerDisplay, resetTimer, addColumn, removeColumn, resetToDefault };
 });

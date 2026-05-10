@@ -9,7 +9,11 @@
     </div>
     <div v-if="timerRunning" class="card-timer">
       <span class="timer-dot"></span>
-      <span>进行中</span>
+      <span class="timer-display">{{ timerDisplay }}</span>
+    </div>
+    <div v-if="hasProcessBinding" class="card-process-binding">
+      <span class="process-icon">🔗</span>
+      <span class="process-name">{{ processBindingName }}</span>
     </div>
   </div>
 </template>
@@ -41,6 +45,18 @@ const isHistorical = computed(() => {
 
 const timerRunning = computed(() => {
   return kanban.activeTimers.has(props.card.taskId);
+});
+
+const timerDisplay = computed(() => {
+  return kanban.getTimerDisplay(props.card.taskId);
+});
+
+const hasProcessBinding = computed(() => {
+  return !!props.card.processBinding;
+});
+
+const processBindingName = computed(() => {
+  return props.card.processBinding?.appName || '';
 });
 
 function onDragStart(e: DragEvent) {
@@ -111,5 +127,29 @@ function onDragStart(e: DragEvent) {
   border-radius: 50%;
   background: var(--color-primary);
   animation: glow-pulse 1.5s ease-in-out infinite;
+}
+
+.timer-display {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.card-process-binding {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+}
+
+.process-icon {
+  font-size: 0.7rem;
+}
+
+.process-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
