@@ -32,6 +32,15 @@
 - Updated `tasks.md` so active tasks include acceptance criteria and linked test cases.
 - Updated `ai-collaboration.md` with explicit AI testing rules for code changes and bug fixes.
 
+## 2026-05-11
+
+### Documentation
+
+- **更新 `tasks.md`**: P0 任务全部归档至 `docs/archive/tasks-2026-05-08.md`，文档精简为只保留活跃工作项。
+- **更新 `build-guide.md`**: 同步 `package.json` 依赖变更（`niuma-faith: file:` 替换 `@tauri-apps/plugin-store`，`@playwright/test` 替换 `playwright`）。
+- **更新 `design-doc.md`**: 修正看板组件描述，标记计时器和进程绑定为框架已实现、功能待补充。
+- **更新测试用例**: `kanban-process-binding.md` 补充 TC-KANBAN-003/004/005 的实际状态说明。
+
 ## Update Rules
 
 - Record user-visible product changes, API changes, schema changes, workflow changes, and major documentation structure changes.

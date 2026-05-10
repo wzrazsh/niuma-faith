@@ -112,13 +112,13 @@ frontend/src/
 │   ├── KanbanPage.vue          # 看板页容器：加载任务 → 渲染 KanbanBoard
 │   ├── FloatingWidget.vue      # 悬浮窗：圆形等级显示，支持拖拽，双击打开主窗口
 │   └── kanban/
-│       ├── KanbanBoard.vue     # 看板主组件：列管理、拖拽、进程绑定、计时器联动
+│       ├── KanbanBoard.vue     # 看板主组件：列管理、拖拽、进程绑定框架、计时器联动
 │       ├── KanbanColumn.vue    # 看板列：拖拽接收区、卡片渲染、列增删
-│       ├── KanbanCard.vue      # 看板卡片：任务信息、实时计时器、进程绑定 UI、操作按钮
-│       └── KanbanCardForm.vue  # 看板任务表单：创建/编辑 + 进程绑定 + 提醒 + 所属列
+│       ├── KanbanCard.vue      # 看板卡片：任务信息、进行中状态指示器、操作按钮
+│       └── KanbanCardForm.vue  # 看板任务表单：创建/编辑 + 提醒 + 所属列
 ├── services/
 │   ├── kanban-api.ts         # 看板配置 localStorage 持久化（列配置、卡片位置）
-│   ├── process-detector.ts   # 进程检测：轮询绑定进程，3 秒间隔，自动启停回调
+│   ├── process-detector.ts   # 进程检测：轮询绑定进程，3 秒间隔，自动启停回调（框架已实现，自动启停逻辑待补充）
 │   └── reminder-service.ts   # 任务提醒：每分钟检查提醒时间，降级到浏览器通知
 └── utils/
     └── format.ts             # 千分位数字格式化
@@ -148,7 +148,7 @@ frontend/src/
 - `addCard(columnId, taskId)`: 将已存在任务关联到指定列
 - `addColumn(title)`, `removeColumn(id)`: 列管理
 - `resetToDefault()`: 清空卡片和计时器，恢复 4 个默认列
-- `startTimer(cardId)`, `stopTimer(cardId)`: 前端实时计时器（setInterval，每秒更新）
+- `startTimer(cardId)`, `stopTimer(cardId)`: 前端计时器框架（setInterval，当前为空回调，实际计时逻辑待实现）
 
 ### 3.3 双模式 IPC 机制
 

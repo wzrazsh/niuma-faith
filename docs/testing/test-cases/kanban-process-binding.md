@@ -28,7 +28,9 @@
 |------|------|
 | 前置条件 | 看板卡片可开始 |
 | 操作步骤 | 点击开始，等待 3 秒，点击暂停 |
-| 预期结果 | UI 计时器递增；任务状态与后端/Mock 同步 |
+| 预期结果 | UI 显示「进行中」状态指示器；任务状态与后端/Mock 同步 |
+| 实际状态 | ⚠️ 计时器未实现：startTimer/stopTimer 创建空 interval，无实际计时逻辑 |
+| 代码位置 | `frontend/src/stores/kanban.ts:224-234` |
 | 自动化路径 | Playwright + fake timer 待评估 |
 | 自动化状态 | Planned |
 
@@ -39,6 +41,8 @@
 | 前置条件 | Windows 环境；任务绑定 `notepad.exe`；自动开始/暂停开启 |
 | 操作步骤 | 启动记事本，等待轮询；关闭记事本，等待轮询 |
 | 预期结果 | 进程启动后任务自动开始；进程退出后任务自动暂停 |
+| 实际状态 | ⚠️ 进程绑定框架存在但自动启停未实现：startPolling 中检测到进程状态后无实际操作 |
+| 代码位置 | `frontend/src/services/process-detector.ts:13-21` |
 | 自动化路径 | 手动 smoke，后续可用本地脚本辅助 |
 | 自动化状态 | Manual |
 
@@ -49,6 +53,8 @@
 | 前置条件 | 卡片已绑定进程 |
 | 操作步骤 | 点击解绑，随后启动原进程 |
 | 预期结果 | UI 不再显示绑定；进程启动不再改变任务状态 |
+| 实际状态 | ⚠️ 解绑 UI 未实现：KanbanCard 无进程绑定显示/解绑按钮；processBinding 仅存在于类型定义 |
+| 代码位置 | `frontend/src/types/kanban.ts:9-13`, `frontend/src/components/kanban/KanbanCard.vue` |
 | 自动化路径 | Playwright 待补充 |
 | 自动化状态 | Planned |
 

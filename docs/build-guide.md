@@ -89,15 +89,15 @@ niuma-faith/
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
-    "@tauri-apps/plugin-store": "^2.0.0",
+    "niuma-faith": "file:",
     "pinia": "^2.1.7",
     "vue": "^3.4.21",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tauri-apps/cli": "^2.0.0",
     "@vitejs/plugin-vue": "^5.0.4",
-    "playwright": "^1.59.1",
     "typescript": "~5.4.0",
     "vite": "^5.2.0",
     "vue-tsc": "^2.0.6"
@@ -355,7 +355,7 @@ npm run tauri build
 
 - [ ] 仪表盘页面加载，显示日历 + 任务列表
 - [ ] 创建任务成功，出现在列表中
-- [ ] 开始/暂停/继续任务，计时器正常
+- [ ] 开始/暂停/继续任务，状态指示器正常（计时器框架待实现）
 - [ ] 完成任务，显示信仰奖励
 - [ ] 打卡功能，信仰计算正确
 - [ ] 看板页面加载，默认四列
@@ -363,7 +363,7 @@ npm run tauri build
 - [ ] 创建每日重复任务，第二天出现虚拟实例
 - [ ] 悬浮窗可打开/关闭
 - [ ] 系统托盘菜单正常
-- [ ] 进程绑定（Windows）自动启停
+- [ ] 进程绑定（Windows）框架已就位（自动启停逻辑待实现）
 
 ### 6.3 数据检查
 
